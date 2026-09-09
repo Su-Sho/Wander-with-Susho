@@ -393,6 +393,11 @@
     margin-bottom:10px;
   }
   .card-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;}
+  .card-icons{display:flex;align-items:center;gap:6px;margin-left:auto;}
+  .icon-btn{background:none;border:none;cursor:pointer;font-size:17px;line-height:1;padding:2px 3px;text-decoration:none;color:var(--ink-soft);}
+  .heart-btn{color:#c9c9c9;}
+  .heart-btn.active{color:#e0245e;}
+  .whatsapp-btn{font-size:16px;}
   .name{font-size:17px;font-weight:700;color:var(--ink);}
   .tag-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px;}
   .loc-tag{
@@ -815,8 +820,20 @@ let activeDiet = "All";
 let activeHalal = "All";
 let porkOnly = false;
 let seafoodOnly = false;
+let favoritesOnly = false;
 let activeTimings = new Set();
 let editingId = null;
+
+// Favorites are per-visitor, stored locally in the browser (no login/Firebase needed).
+const FAVORITES_KEY = 'susho_favorites';
+function loadFavorites(){
+  try { return new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]')); }
+  catch(e){ return new Set(); }
+}
+function saveFavorites(){
+  localStorage.setItem(FAVORITES_KEY, JSON.stringify(Array.from(favorites)));
+}
+let favorites = loadFavorites();
 let formTimings = new Set();
 
 const SEED_DATA = [
@@ -2460,6 +2477,12 @@ function populateDietChips(){
   seafoodChip.textContent = "Seafood";
   seafoodChip.addEventListener('click', ()=>{ seafoodOnly = !seafoodOnly; populateDietChips(); render(); });
   els.halalPorkChips.appendChild(seafoodChip);
+
+  const favoritesChip = document.createElement('div');
+  favoritesChip.className = 'chip' + (favoritesOnly ? " active" : "");
+  favoritesChip.textContent = "❤ My Favorites";
+  favoritesChip.addEventListener('click', ()=>{ favoritesOnly = !favoritesOnly; populateDietChips(); render(); });
+  els.halalPorkChips.appendChild(favoritesChip);
 }
 function populateTimingFilterChips(){
   els.timingChips.innerHTML = "";
@@ -2534,6 +2557,8 @@ function render(){
   });
 
   // Group entries that share a Chain name so branches list under one card.
+  // "group" always includes the main entry itself, so any branch can later be swapped in
+  // as the card's main entry and still know who its own branches are.
   const chainGroups = {};
   const cards = [];
   filtered.forEach(p=>{
@@ -2542,17 +2567,24 @@ function render(){
       if(!chainGroups[key]) chainGroups[key] = [];
       chainGroups[key].push(p);
     } else {
-      cards.push({ main: p, branches: [] });
+      cards.push({ main: p, group: [p] });
     }
   });
   Object.values(chainGroups).forEach(group=>{
     group.sort((a,b)=>(a.area||'').localeCompare(b.area||''));
-    cards.push({ main: group[0], branches: group.slice(1) });
+    cards.push({ main: group[0], group: group });
   });
+
+  if(favoritesOnly){
+    for(let i = cards.length - 1; i >= 0; i--){
+      if(!cards[i].group.some(g => favorites.has(g.id))) cards.splice(i, 1);
+    }
+  }
 
   cards.sort((a,b)=> (a.main.name||'').localeCompare(b.main.name||''));
 
-  els.count.textContent = filtered.length + (filtered.length===1?' spot found':' spots found');
+  const visibleCount = favoritesOnly ? cards.reduce((sum, c)=> sum + c.group.length, 0) : filtered.length;
+  els.count.textContent = visibleCount + (visibleCount===1?' spot found':' spots found');
   els.results.innerHTML = "";
 
   if(cards.length === 0){
@@ -2569,7 +2601,7 @@ function render(){
       const h = document.createElement('div'); h.className='letter-heading'; h.textContent=currentLetter;
       els.results.appendChild(h);
     }
-    els.results.appendChild(buildCard(p, item.branches));
+    els.results.appendChild(buildCard(p, item.group));
   });
 }
 
@@ -2624,8 +2656,9 @@ function jumpToPlace(id){
   });
 }
 
-function buildCard(p, branches){
-  branches = branches || [];
+function buildCard(p, group){
+  group = group || [p];
+  const branches = group.filter(g=>g.id !== p.id);
   const card = document.createElement('div');
   card.className = 'card';
   card.dataset.mainId = p.id;
@@ -2686,27 +2719,14 @@ function buildCard(p, branches){
     }
   }
 
+  // Clicking a branch row swaps the ENTIRE card to that branch's own full entry
+  // (its own details/timings/etc), with the other branches — including the current one — listed under it.
   let branchesBox = '';
   if(branches.length){
-    const rows = branches.map((b, idx)=>{
-      const detailId = `bdetail-${p.id}-${idx}`;
+    const rows = branches.map((b)=>{
       const bLoc = b.location ? `, ${escapeHtml(b.location)}` : '';
       const bHoursShort = (b.hours && b.hours.trim()) ? b.hours : (mergedTimingLabels(b.timings)[0] || '');
-      const bUsp = b.usp ? `<div class="usp-line"><strong>Must Try:</strong> ${escapeHtml(b.usp)}</div>` : '';
-      const bMapLine = b.maplink ? `<div class="hours-line">📍 <a href="${escapeAttr(b.maplink)}" target="_blank" rel="noopener noreferrer" style="color:var(--search-accent);">Open in Google Maps</a></div>` : '';
-      const bHoursLine = b.hours ? `<div class="hours-line">⏱ ${escapeHtml(b.hours)}</div>` : '';
-      const bHy = b.hygiene || {};
-      const bHyEntries = [
-        ['Kitchen', bHy.kitchen], ['Tables', bHy.tables], ['Glasses', bHy.glass],
-        ['Floor', bHy.floor], ['Toilet', bHy.toilet], ['Staff', bHy.staff], ['Service', bHy.service],
-      ].filter(([,v])=> v !== null && v !== undefined && v !== "");
-      const bHygieneBox = bHyEntries.length ? `<div class="hygiene-box"><p class="hygiene-label">Hygiene</p><div class="hygiene-grid">${
-        bHyEntries.map(([label,val])=>`<div class="hygiene-row"><span>${label}</span><span>${val}</span></div>`).join('')
-      }</div></div>` : '';
-      const bNote = b.note ? `<div class="note">${escapeHtml(b.note)}</div>` : '';
-      return `
-        <div class="branch-row" data-toggle="${detailId}">${escapeHtml(b.area)}${bLoc}${bHoursShort ? ` — ${escapeHtml(bHoursShort)}` : ''} <span class="branch-expand">Details ▾</span></div>
-        <div class="branch-detail" id="${detailId}" style="display:none;">${bUsp}${bHoursLine}${bMapLine}${bNote}${bHygieneBox}</div>`;
+      return `<div class="branch-row" data-branch-id="${escapeAttr(b.id)}">${escapeHtml(b.area)}${bLoc}${bHoursShort ? ` — ${escapeHtml(bHoursShort)}` : ''} <span class="branch-expand">View branch ▸</span></div>`;
     }).join('');
     branchesBox = `<div class="branches-box"><p class="branches-label">${branches.length} more branch${branches.length===1?'':'es'}</p>${rows}</div>`;
   }
@@ -2718,9 +2738,15 @@ function buildCard(p, branches){
       <button class="btn-danger btn-small" data-action="delete" data-id="${p.id}">Delete</button>
     </div>` : '';
 
+  const heartActive = favorites.has(p.id);
+  const heartBtn = `<button type="button" class="icon-btn heart-btn${heartActive ? ' active' : ''}" data-fav-id="${escapeAttr(p.id)}" title="${heartActive ? 'Remove from favorites' : 'Add to favorites'}" aria-label="Favorite">${heartActive ? '♥' : '♡'}</button>`;
+  const shareText = `Check out ${p.name || 'this place'} in ${p.area || ''}${p.district ? ', ' + p.district : ''} — found on Wander with SuSho: ${window.location.href.split('#')[0]}`;
+  const whatsappBtn = `<a class="icon-btn whatsapp-btn" href="https://wa.me/?text=${encodeURIComponent(shareText)}" target="_blank" rel="noopener noreferrer" title="Share on WhatsApp" aria-label="Share on WhatsApp">📲</a>`;
+
   card.innerHTML = `
     <div class="card-top">
       <span class="name">${p.name ? escapeHtml(p.name) : '(Unnamed spot)'}${mapIcon}</span>
+      <div class="card-icons">${heartBtn}${whatsappBtn}</div>
       <div class="tag-row">
         <span class="loc-tag">${escapeHtml(p.area)}</span>
         <span class="loc-tag">${escapeHtml(p.district)}, ${escapeHtml(p.state)}</span>
@@ -2748,15 +2774,29 @@ function buildCard(p, branches){
   if(altEl){
     altEl.addEventListener('click', (e)=>{ e.preventDefault(); jumpToPlace(altEl.dataset.altId); });
   }
-  card.querySelectorAll('[data-toggle]').forEach(row=>{
+  card.querySelectorAll('[data-branch-id]').forEach(row=>{
     row.addEventListener('click', ()=>{
-      const detail = card.querySelector('#' + CSS.escape(row.dataset.toggle));
-      if(!detail) return;
-      const show = detail.style.display === 'none';
-      detail.style.display = show ? 'block' : 'none';
-      row.classList.toggle('expanded', show);
+      const branchPlace = group.find(g=>g.id === row.dataset.branchId);
+      if(!branchPlace) return;
+      const newCard = buildCard(branchPlace, group);
+      card.replaceWith(newCard);
+      newCard.scrollIntoView({behavior:'smooth', block:'start'});
     });
   });
+  const heartEl = card.querySelector('[data-fav-id]');
+  if(heartEl){
+    heartEl.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const id = heartEl.dataset.favId;
+      if(favorites.has(id)) favorites.delete(id); else favorites.add(id);
+      saveFavorites();
+      const nowActive = favorites.has(id);
+      heartEl.classList.toggle('active', nowActive);
+      heartEl.textContent = nowActive ? '♥' : '♡';
+      heartEl.title = nowActive ? 'Remove from favorites' : 'Add to favorites';
+      if(favoritesOnly) render();
+    });
+  }
   if(isAdmin){
     card.querySelector('[data-action="edit"]').addEventListener('click', ()=>openEdit(p.id));
     card.querySelector('[data-action="duplicate"]').addEventListener('click', ()=>duplicatePlace(p.id));
