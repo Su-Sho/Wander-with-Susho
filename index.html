@@ -223,6 +223,26 @@
     color:#854F0B;
     border:1px solid #EF9F27;
   }
+  .seafood-tag{
+    font-family:'Courier New',monospace;
+    font-size:10.5px;
+    padding:2px 8px;
+    border-radius:999px;
+    white-space:nowrap;
+    background:#DEF0F3;
+    color:#0E6B7A;
+    border:1px solid #9FD3DC;
+  }
+  .map-icon-link{
+    font-family:'Courier New',monospace;
+    font-size:11px;
+    font-weight:normal;
+    color:var(--search-accent);
+    text-decoration:none;
+    white-space:nowrap;
+    margin-left:4px;
+  }
+  .map-icon-link:hover{ text-decoration:underline; }
   .branches-box{
     margin-top:10px;
     padding-top:10px;
@@ -591,6 +611,9 @@
         <label>Category</label>
         <select id="f_category"></select>
         <input type="text" id="f_category_new" class="new-value-input" placeholder="Enter new category" style="display:none;margin-top:6px;">
+        <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-weight:normal;">
+          <input type="checkbox" id="f_seafood" style="width:auto;"> Seafood (tag, filterable under Food)
+        </label>
       </div>
       <div class="field">
         <label>Price Level</label>
@@ -654,7 +677,7 @@
         <input type="text" id="f_name" placeholder="Spot name — you can add this later">
       </div>
       <div class="field full">
-        <label>USP — what makes this place stand out</label>
+        <label>Must Try (USP) — what makes this place stand out</label>
         <input type="text" id="f_usp" placeholder="e.g. Smoked beef ribs, 12-hour marinade">
       </div>
       <div class="field full">
@@ -769,7 +792,8 @@ let activeCategory = "All";
 let activePrice = "All";
 let activeDiet = "All";
 let activeHalal = "All";
-let excludePork = false;
+let porkOnly = false;
+let seafoodOnly = false;
 let activeTimings = new Set();
 let editingId = null;
 let formTimings = new Set();
@@ -2097,6 +2121,7 @@ const els = {
   f_location_new: document.getElementById('f_location_new'),
   f_category: document.getElementById('f_category'),
   f_category_new: document.getElementById('f_category_new'),
+  f_seafood: document.getElementById('f_seafood'),
   f_price: document.getElementById('f_price'),
   f_hours: document.getElementById('f_hours'),
   f_distance: document.getElementById('f_distance'),
@@ -2123,6 +2148,10 @@ const els = {
 };
 
 function uniqueSorted(arr){ return Array.from(new Set(arr.filter(v=>v!==undefined && v!==null && v!==""))).sort(); }
+// "Seafood" used to be its own category. It now lives under "Food" as a tag instead.
+// This keeps old entries working without needing to manually edit every existing record.
+function effectiveCategory(p){ return p.category === "Seafood" ? "Food" : (p.category || ""); }
+function isSeafood(p){ return p.category === "Seafood" || (Array.isArray(p.tags) && p.tags.includes("Seafood")); }
 function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function escapeAttr(s){ return String(s).replace(/"/g,'&quot;'); }
 
@@ -2162,6 +2191,52 @@ function mergedTimingLabels(timings){
   return merged.map(m => `${formatHour(m.start)} – ${formatHour(m.end)}`);
 }
 
+
+// Parses a single time token like "7 AM", "11:30 PM", "12 AM" into hours-since-midnight (0-24).
+function parseTimeToken(token){
+  const m = token.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*([AaPp][Mm])$/);
+  if(!m) return null;
+  let h = parseInt(m[1], 10);
+  const min = m[2] ? parseInt(m[2], 10) : 0;
+  const ap = m[3].toUpperCase();
+  if(ap === 'AM'){ if(h === 12) h = 0; } else { if(h !== 12) h += 12; }
+  return h + min / 60;
+}
+// Parses free-text hours (e.g. "7 AM–11 PM, 4 PM-7 PM") into [{start,end}, ...] ranges,
+// extending past 24 for entries that cross midnight, to match the TIMING_RANGES scale.
+function parseHoursRanges(hoursText){
+  if(!hoursText) return [];
+  if(/24\s*(hours|hrs|hr)/i.test(hoursText)) return [{start: 0, end: 28}];
+  const parts = hoursText.split(/,|;/).map(s => s.trim()).filter(Boolean);
+  const ranges = [];
+  parts.forEach(part => {
+    const seg = part.split(/–|—|-|to/i).map(s => s.trim()).filter(Boolean);
+    if(seg.length !== 2) return;
+    const start = parseTimeToken(seg[0]);
+    let end = parseTimeToken(seg[1]);
+    if(start === null || end === null) return;
+    if(end <= start) end += 24; // crosses midnight
+    ranges.push({start, end});
+  });
+  return ranges;
+}
+function rangesOverlap(a, b){ return a.start < b.end && b.start < a.end; }
+// Checks whether a place's free-text hours overlap a given TIMING_BUCKETS key's hour range,
+// so custom hours (not matching any fixed tag) still surface in timing-tag filtering.
+function hoursMatchesTimingKey(hoursText, key){
+  if(key === "24 Hours"){
+    return /24\s*(hours|hrs|hr)/i.test(hoursText || "");
+  }
+  const bucket = TIMING_RANGES[key];
+  if(!bucket) return false;
+  const br = {start: bucket[0], end: bucket[1]};
+  const parsed = parseHoursRanges(hoursText);
+  return parsed.some(r =>
+    rangesOverlap(r, br) ||
+    rangesOverlap({start: r.start + 24, end: r.end + 24}, br) ||
+    rangesOverlap({start: r.start - 24, end: r.end - 24}, br)
+  );
+}
 
 const NEW_OPTION = "__new__";
 
@@ -2227,7 +2302,7 @@ function refreshFormLocationOptions(){
 }
 
 function refreshFormCategoryOptions(){
-  buildSelectOptions(els.f_category, uniqueSorted(PLACES.map(p=>p.category)));
+  buildSelectOptions(els.f_category, uniqueSorted(PLACES.map(p=>effectiveCategory(p))));
   toggleNewInput(els.f_category, els.f_category_new);
 }
 
@@ -2311,7 +2386,7 @@ function populateLocationOptions(){
   els.locationFilter.value = locs.includes(prev) ? prev : "All Locations";
 }
 function populateCategoryChips(){
-  const categories = ["All", ...uniqueSorted(PLACES.map(p=>p.category))];
+  const categories = ["All", ...uniqueSorted(PLACES.map(p=>effectiveCategory(p)))];
   els.categoryChips.innerHTML = "";
   if(!categories.includes(activeCategory)) activeCategory = "All";
   categories.forEach(cat=>{
@@ -2354,10 +2429,16 @@ function populateDietChips(){
     els.halalPorkChips.appendChild(c);
   });
   const porkChip = document.createElement('div');
-  porkChip.className = 'chip' + (excludePork ? " active" : "");
-  porkChip.textContent = "Hide Pork-Serving";
-  porkChip.addEventListener('click', ()=>{ excludePork = !excludePork; populateDietChips(); render(); });
+  porkChip.className = 'chip' + (porkOnly ? " active" : "");
+  porkChip.textContent = "Serves Pork";
+  porkChip.addEventListener('click', ()=>{ porkOnly = !porkOnly; populateDietChips(); render(); });
   els.halalPorkChips.appendChild(porkChip);
+
+  const seafoodChip = document.createElement('div');
+  seafoodChip.className = 'chip' + (seafoodOnly ? " active" : "");
+  seafoodChip.textContent = "Seafood";
+  seafoodChip.addEventListener('click', ()=>{ seafoodOnly = !seafoodOnly; populateDietChips(); render(); });
+  els.halalPorkChips.appendChild(seafoodChip);
 }
 function populateTimingFilterChips(){
   els.timingChips.innerHTML = "";
@@ -2409,16 +2490,20 @@ function render(){
     const matchesDistrict = di === "All Districts" ? true : p.district === di;
     const matchesArea = ar === "All Areas" ? true : p.area === ar;
     const matchesLocation = loc === "All Locations" ? true : p.location === loc;
-    const matchesCat = activeCategory === "All" ? true : p.category === activeCategory;
+    const matchesCat = activeCategory === "All" ? true : effectiveCategory(p) === activeCategory;
     const matchesPrice = activePrice === "All" ? true : p.price === activePrice;
     const matchesDiet = activeDiet === "All" ? true : p.diet === activeDiet;
     const matchesHalal = activeHalal === "All" ? true : p.halal === "Yes";
-    const matchesPork = excludePork ? p.pork !== "Yes" : true;
-    const matchesTiming = activeTimings.size === 0 ? true : (p.timings || []).some(t => activeTimings.has(t));
+    const matchesPork = porkOnly ? p.pork === "Yes" : true;
+    const matchesSeafood = seafoodOnly ? isSeafood(p) : true;
+    const matchesTiming = activeTimings.size === 0 ? true : (
+      (p.timings || []).some(t => activeTimings.has(t)) ||
+      Array.from(activeTimings).some(t => hoursMatchesTimingKey(p.hours, t))
+    );
     const matchesDistance = distSel === "All" ? true : distanceBucket(p.distance_km) === distSel;
-    const hay = (p.name+" "+p.state+" "+p.district+" "+p.area+" "+(p.location||"")+" "+p.category+" "+(p.chain||"")+" "+(p.usp||"")+" "+p.note).toLowerCase();
+    const hay = (p.name+" "+p.state+" "+p.district+" "+p.area+" "+(p.location||"")+" "+effectiveCategory(p)+" "+(p.chain||"")+" "+(p.usp||"")+" "+((p.tags||[]).join(" "))+" "+p.note).toLowerCase();
     const matchesQ = q === "" ? true : hay.includes(q);
-    return matchesState && matchesDistrict && matchesArea && matchesLocation && matchesCat && matchesPrice && matchesDiet && matchesHalal && matchesPork && matchesTiming && matchesDistance && matchesQ;
+    return matchesState && matchesDistrict && matchesArea && matchesLocation && matchesCat && matchesPrice && matchesDiet && matchesHalal && matchesPork && matchesSeafood && matchesTiming && matchesDistance && matchesQ;
   });
 
   // Group entries that share a Chain name so branches list under one card.
@@ -2464,7 +2549,19 @@ function render(){
 function findClosestAlternative(p){
   // No GPS coordinates are stored (removed for simplicity), so this is an approximation:
   // same Category AND same Diet Type (if set) — prefer same Area, fall back to same District.
-  let pool = PLACES.filter(x=>x.id!==p.id && x.category===p.category);
+  // Exclude anything that's actually the same restaurant (same name, or same chain/branch group) —
+  // those belong under "Other Branches", not "Alternative nearby".
+  const pName = (p.name || '').trim().toLowerCase();
+  const pChain = (p.chain || '').trim().toLowerCase();
+  let pool = PLACES.filter(x=>{
+    if(x.id === p.id) return false;
+    if(effectiveCategory(x) !== effectiveCategory(p)) return false;
+    const xName = (x.name || '').trim().toLowerCase();
+    if(pName && xName === pName) return false;
+    const xChain = (x.chain || '').trim().toLowerCase();
+    if(pChain && xChain && xChain === pChain) return false;
+    return true;
+  });
   if(p.diet){
     pool = pool.filter(x=>x.diet === p.diet);
   }
@@ -2483,20 +2580,25 @@ function buildCard(p, branches){
   if(p.distance_km !== null && p.distance_km !== undefined && p.distance_km !== ""){
     distanceLine = `<span class="loc-tag">${p.distance_km} km from ${escapeHtml(p.area)}</span>`;
   }
-  const timingTags = mergedTimingLabels(p.timings).map(label=>`<span class="time-tag">${escapeHtml(label)}</span>`).join('');
+  let timingTags = mergedTimingLabels(p.timings).map(label=>`<span class="time-tag">${escapeHtml(label)}</span>`).join('');
+  // If no fixed timing tags were picked but a custom hours range was typed in, show that instead.
+  if(!timingTags && p.hours){
+    timingTags = `<span class="time-tag">${escapeHtml(p.hours)}</span>`;
+  }
   const priceTag = p.price ? `<span class="price-tag">${escapeHtml(p.price)}</span>` : '';
   const paymentTag = p.payment ? `<span class="payment-tag">${escapeHtml(p.payment)}</span>` : '';
   const hoursLine = p.hours ? `<div class="hours-line">⏱ ${escapeHtml(p.hours)}</div>` : '';
   const locationLine = exactLoc ? `<div class="hours-line">📍 ${exactLoc}</div>` : '';
   const instagramLine = p.instagram ? `<div class="hours-line">📷 <a href="${escapeAttr(p.instagram)}" target="_blank" rel="noopener noreferrer" style="color:var(--search-accent);">View on Instagram</a></div>` : '';
-  const uspLine = p.usp ? `<div class="usp-line">${escapeHtml(p.usp)}</div>` : '';
-  const mapLine = p.maplink ? `<div class="hours-line">📍 <a href="${escapeAttr(p.maplink)}" target="_blank" rel="noopener noreferrer" style="color:var(--search-accent);">Open in Google Maps</a></div>` : '';
+  const uspLine = p.usp ? `<div class="usp-line"><strong>Must Try:</strong> ${escapeHtml(p.usp)}</div>` : '';
+  const mapIcon = p.maplink ? ` <a href="${escapeAttr(p.maplink)}" target="_blank" rel="noopener noreferrer" class="map-icon-link" title="Open in Google Maps">📍 Map</a>` : '';
 
   let dietTag = '';
   if(p.diet === 'Veg') dietTag = `<span class="diet-tag veg">VEG</span>`;
   else if(p.diet === 'Non-Veg') dietTag = `<span class="diet-tag nonveg">NON-VEG</span>`;
   const halalTag = p.halal === 'Yes' ? `<span class="halal-tag">Halal</span>` : '';
-  const porkTag = p.pork === 'Yes' ? `<span class="pork-tag">Contains Pork</span>` : '';
+  const porkTag = p.pork === 'Yes' ? `<span class="pork-tag">Serves Pork</span>` : '';
+  const seafoodTag = isSeafood(p) ? `<span class="seafood-tag">Seafood</span>` : '';
 
   let chainTag = '';
   const totalBranches = branches.length + 1;
@@ -2531,18 +2633,19 @@ function buildCard(p, branches){
       const bMap = b.maplink ? ` · <a href="${escapeAttr(b.maplink)}" target="_blank" rel="noopener noreferrer">Map</a>` : '';
       return `<div class="branch-row">${escapeHtml(b.area)}${bLoc}${bHours}${bMap}</div>`;
     }).join('');
-    branchesBox = `<div class="branches-box"><p class="branches-label">Other Branches (${branches.length})</p>${rows}</div>`;
+    branchesBox = `<div class="branches-box"><p class="branches-label">Branches (${branches.length})</p>${rows}</div>`;
   }
 
   const adminButtons = isAdmin ? `
     <div class="card-actions">
       <button class="btn-ghost btn-small" data-action="edit" data-id="${p.id}">Edit</button>
+      <button class="btn-ghost btn-small" data-action="duplicate" data-id="${p.id}">Duplicate</button>
       <button class="btn-danger btn-small" data-action="delete" data-id="${p.id}">Delete</button>
     </div>` : '';
 
   card.innerHTML = `
     <div class="card-top">
-      <span class="name">${p.name ? escapeHtml(p.name) : '(Unnamed spot)'}</span>
+      <span class="name">${p.name ? escapeHtml(p.name) : '(Unnamed spot)'}${mapIcon}</span>
       <div class="tag-row">
         <span class="loc-tag">${escapeHtml(p.area)}</span>
         <span class="loc-tag">${escapeHtml(p.district)}, ${escapeHtml(p.state)}</span>
@@ -2550,13 +2653,12 @@ function buildCard(p, branches){
         ${dietTag}
       </div>
     </div>
-    <div class="tag-row">${distanceLine}${timingTags}${paymentTag}${halalTag}${porkTag}${chainTag}</div>
-    <span class="cat-tag">${escapeHtml(p.category)}</span>
+    <div class="tag-row">${distanceLine}${timingTags}${paymentTag}${halalTag}${porkTag}${seafoodTag}${chainTag}</div>
+    <span class="cat-tag">${escapeHtml(effectiveCategory(p))}</span>
     ${uspLine}
     ${locationLine}
     ${hoursLine}
     ${instagramLine}
-    ${mapLine}
     <div class="note">${escapeHtml(p.note)}</div>
     ${hygieneBox}
     ${altLine}
@@ -2573,6 +2675,7 @@ function buildCard(p, branches){
   }
   if(isAdmin){
     card.querySelector('[data-action="edit"]').addEventListener('click', ()=>openEdit(p.id));
+    card.querySelector('[data-action="duplicate"]').addEventListener('click', ()=>duplicatePlace(p.id));
     card.querySelector('[data-action="delete"]').addEventListener('click', ()=>deletePlace(p.id));
   }
   return card;
@@ -2598,7 +2701,8 @@ function openEdit(id){
   refreshFormDistrictOptions(); els.f_district.value = p.district || ""; toggleNewInput(els.f_district, els.f_district_new);
   refreshFormAreaOptions(); els.f_area.value = p.area || ""; toggleNewInput(els.f_area, els.f_area_new);
   refreshFormLocationOptions(); els.f_location.value = p.location || ""; toggleNewInput(els.f_location, els.f_location_new);
-  refreshFormCategoryOptions(); els.f_category.value = p.category || ""; toggleNewInput(els.f_category, els.f_category_new);
+  refreshFormCategoryOptions(); els.f_category.value = effectiveCategory(p); toggleNewInput(els.f_category, els.f_category_new);
+  els.f_seafood.checked = isSeafood(p);
 
   els.f_price.value = p.price || "";
   els.f_hours.value = p.hours || "";
@@ -2628,12 +2732,56 @@ function openEdit(id){
   els.saveStatus.textContent = "";
   els.addPanel.scrollIntoView({behavior:'smooth', block:'start'});
 }
+function duplicatePlace(id){
+  const p = PLACES.find(x=>x.id===id);
+  if(!p) return;
+  editingId = null; // duplicating always creates a brand-new entry
+  els.addPanelTitle.textContent = "Add Branch (from " + (p.name || "duplicate") + ")";
+  els.saveAddBtn.textContent = "Save as New Place";
+
+  refreshFormStateOptions(); els.f_state.value = p.state || ""; toggleNewInput(els.f_state, els.f_state_new);
+  refreshFormDistrictOptions(); els.f_district.value = p.district || ""; toggleNewInput(els.f_district, els.f_district_new);
+  refreshFormAreaOptions(); els.f_area.value = ""; toggleNewInput(els.f_area, els.f_area_new); // fill in the new branch's area
+  refreshFormLocationOptions(); els.f_location.value = ""; toggleNewInput(els.f_location, els.f_location_new);
+  refreshFormCategoryOptions(); els.f_category.value = effectiveCategory(p); toggleNewInput(els.f_category, els.f_category_new);
+  els.f_seafood.checked = isSeafood(p);
+
+  els.f_price.value = p.price || "";
+  els.f_hours.value = p.hours || "";
+  els.f_distance.value = "";
+  els.f_maplink.value = "";
+  // Auto-fill Chain with the restaurant's name (if not already a chain) so both entries group as branches.
+  els.f_chain.value = (p.chain && p.chain.trim()) ? p.chain : (p.name || "");
+  els.f_payment.value = p.payment || "";
+  els.f_diet.value = p.diet || "";
+  els.f_halal.value = p.halal || "";
+  els.f_pork.value = p.pork || "";
+  syncDietFieldsVisibility();
+  els.f_usp.value = p.usp || "";
+  els.f_name.value = p.name || "";
+  els.f_instagram.value = "";
+  els.f_note.value = p.note || "";
+  const hy = p.hygiene || {};
+  els.h_kitchen.value = hy.kitchen ?? "";
+  els.h_tables.value = hy.tables ?? "";
+  els.h_glass.value = hy.glass ?? "";
+  els.h_floor.value = hy.floor ?? "";
+  els.h_toilet.value = hy.toilet ?? "";
+  els.h_staff.value = hy.staff ?? "";
+  els.h_service.value = hy.service ?? "";
+  formTimings = new Set(p.timings || []);
+  syncFormTimingChipsUI();
+  els.addPanel.classList.add('open');
+  els.saveStatus.textContent = "Duplicated — set the new Area/Location, then Save.";
+  els.addPanel.scrollIntoView({behavior:'smooth', block:'start'});
+}
 function clearForm(){
   refreshFormStateOptions(); els.f_state.value=""; els.f_state_new.value=""; toggleNewInput(els.f_state, els.f_state_new);
   refreshFormDistrictOptions(); els.f_district.value=""; els.f_district_new.value=""; toggleNewInput(els.f_district, els.f_district_new);
   refreshFormAreaOptions(); els.f_area.value=""; els.f_area_new.value=""; toggleNewInput(els.f_area, els.f_area_new);
   refreshFormLocationOptions(); els.f_location.value=""; els.f_location_new.value=""; toggleNewInput(els.f_location, els.f_location_new);
   refreshFormCategoryOptions(); els.f_category.value=""; els.f_category_new.value=""; toggleNewInput(els.f_category, els.f_category_new);
+  els.f_seafood.checked = false;
   els.f_price.value=""; els.f_hours.value=""; els.f_distance.value="";
   els.f_maplink.value="";
   els.f_chain.value=""; els.f_payment.value=""; els.f_usp.value="";
@@ -2672,6 +2820,7 @@ async function saveForm(){
     area: getSelectValue(els.f_area, els.f_area_new),
     location: getSelectValue(els.f_location, els.f_location_new),
     category: getSelectValue(els.f_category, els.f_category_new) || "Uncategorized",
+    tags: els.f_seafood.checked ? ["Seafood"] : [],
     price: els.f_price.value,
     hours: els.f_hours.value.trim(),
     distance_km: els.f_distance.value === "" ? null : parseFloat(els.f_distance.value),
