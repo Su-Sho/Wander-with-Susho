@@ -182,6 +182,8 @@
     transition:.15s;
   }
   .chip.active{background:var(--filter-accent);border-color:var(--filter-accent);color:#FFFFFF;font-weight:bold;}
+  select.filter-active{background-color:#FCE7C1;border:2px solid var(--filter-accent);font-weight:bold;}
+  #search.filter-active{background-color:#FCE7C1;border:2px solid var(--filter-accent);}
   .filter-chip-btn{
     font-family:'Courier New',monospace;
     font-size:11.5px;
@@ -259,11 +261,29 @@
   .branch-row{
     font-size:12.5px;
     color:var(--ink-soft);
-    padding:4px 0;
+    padding:6px 2px;
     border-bottom:1px dashed var(--card-border);
+    cursor:pointer;
   }
   .branch-row:last-child{border-bottom:none;}
   .branch-row a{color:var(--search-accent);}
+  .branch-expand{
+    float:right;
+    font-family:'Courier New',monospace;
+    font-size:10.5px;
+    color:var(--search-accent);
+  }
+  .branch-row.expanded .branch-expand{text-decoration:underline;}
+  .branch-detail{
+    padding:4px 4px 8px 10px;
+    margin-bottom:4px;
+    border-left:2px solid var(--card-border);
+  }
+  @keyframes flashHighlight{
+    0%{ box-shadow:0 0 0 3px var(--search-accent); }
+    100%{ box-shadow:0 0 0 0 transparent; }
+  }
+  .card.flash-highlight{ animation:flashHighlight 1.6s ease-out; }
   .clear-chips-btn{
     font-family:'Courier New',monospace;
     font-size:10px;
@@ -320,13 +340,14 @@
     color:var(--add-accent);
   }
   .field input, .field textarea, .field select{
-    padding:9px 10px;
+    padding:10px 11px;
     border-radius:8px;
     border:1px solid var(--add-border);
     background:#FFFFFF;
     color:var(--ink);
     font-family:'Courier New',monospace;
-    font-size:13px;
+    font-size:15px;
+    font-weight:700;
     width:100%;
   }
   .field textarea{resize:vertical;min-height:50px;font-family:Georgia,serif;}
@@ -2478,12 +2499,18 @@ function syncFormTimingChipsUI(){
 function render(){
   const q = els.search.value.trim().toLowerCase();
   els.searchClearBtn.classList.toggle('show', q.length > 0);
+  els.search.classList.toggle('filter-active', q.length > 0);
 
   const st = els.stateFilter.value;
   const di = els.districtFilter.value;
   const ar = els.areaFilter.value;
   const loc = els.locationFilter.value;
   const distSel = els.distanceFilter.value;
+  els.stateFilter.classList.toggle('filter-active', st !== "All States");
+  els.districtFilter.classList.toggle('filter-active', di !== "All Districts");
+  els.areaFilter.classList.toggle('filter-active', ar !== "All Areas");
+  els.locationFilter.classList.toggle('filter-active', loc !== "All Locations");
+  els.distanceFilter.classList.toggle('filter-active', distSel !== "All");
 
   let filtered = PLACES.filter(p=>{
     const matchesState = st === "All States" ? true : p.state === st;
@@ -2547,51 +2574,81 @@ function render(){
 }
 
 function findClosestAlternative(p){
-  // No GPS coordinates are stored (removed for simplicity), so this is an approximation:
-  // same Category AND same Diet Type (if set) — prefer same Area, fall back to same District.
+  // No GPS coordinates are stored, so this is an approximation restricted to the SAME Area only —
+  // a district-wide fallback was removed because it could suggest places many km away.
   // Exclude anything that's actually the same restaurant (same name, or same chain/branch group) —
-  // those belong under "Other Branches", not "Alternative nearby".
+  // those belong under "Branches", not "Alternative nearby". Diet must match exactly (Veg/Non-Veg/blank),
+  // so a Veg place never gets suggested a Non-Veg "alternative".
   const pName = (p.name || '').trim().toLowerCase();
   const pChain = (p.chain || '').trim().toLowerCase();
-  let pool = PLACES.filter(x=>{
+  const pool = PLACES.filter(x=>{
     if(x.id === p.id) return false;
+    if(x.area !== p.area) return false;
     if(effectiveCategory(x) !== effectiveCategory(p)) return false;
+    if((x.diet || '') !== (p.diet || '')) return false;
     const xName = (x.name || '').trim().toLowerCase();
     if(pName && xName === pName) return false;
     const xChain = (x.chain || '').trim().toLowerCase();
     if(pChain && xChain && xChain === pChain) return false;
     return true;
   });
-  if(p.diet){
-    pool = pool.filter(x=>x.diet === p.diet);
-  }
-  let alt = pool.find(x=>x.area===p.area);
-  if(!alt) alt = pool.find(x=>x.district===p.district);
+  const alt = pool[0];
   return alt ? { place: alt, km: null } : null;
+}
+
+// Jumps the view to a specific place: clears filters that could hide it, re-renders,
+// then scrolls to and briefly highlights its card (used by "Alternative nearby" links).
+function jumpToPlace(id){
+  els.search.value = "";
+  els.stateFilter.value = "All States"; populateDistrictOptions();
+  els.districtFilter.value = "All Districts"; populateAreaOptions();
+  els.areaFilter.value = "All Areas"; populateLocationOptions();
+  els.locationFilter.value = "All Locations";
+  els.distanceFilter.value = "All";
+  activeCategory = "All"; activePrice = "All"; activeDiet = "All"; activeHalal = "All";
+  porkOnly = false; seafoodOnly = false; activeTimings = new Set();
+  populateCategoryChips(); populatePriceChips(); populateDietChips(); populateTimingFilterChips();
+  render();
+  requestAnimationFrame(()=>{
+    const card = Array.from(els.results.children).find(el=>{
+      if(!el.dataset) return false;
+      if(el.dataset.mainId === id) return true;
+      if(el.dataset.branchIds && el.dataset.branchIds.split(',').includes(id)) return true;
+      return false;
+    });
+    if(card){
+      card.scrollIntoView({behavior:'smooth', block:'center'});
+      card.classList.add('flash-highlight');
+      setTimeout(()=>card.classList.remove('flash-highlight'), 1600);
+    }
+  });
 }
 
 function buildCard(p, branches){
   branches = branches || [];
   const card = document.createElement('div');
   card.className = 'card';
+  card.dataset.mainId = p.id;
+  card.dataset.branchIds = branches.map(b=>b.id).join(',');
   const exactLoc = p.location ? escapeHtml(p.location) : '';
 
   let distanceLine = '';
   if(p.distance_km !== null && p.distance_km !== undefined && p.distance_km !== ""){
     distanceLine = `<span class="loc-tag">${p.distance_km} km from ${escapeHtml(p.area)}</span>`;
   }
-  let timingTags = mergedTimingLabels(p.timings).map(label=>`<span class="time-tag">${escapeHtml(label)}</span>`).join('');
-  // If no fixed timing tags were picked but a custom hours range was typed in, show that instead.
-  if(!timingTags && p.hours){
-    timingTags = `<span class="time-tag">${escapeHtml(p.hours)}</span>`;
-  }
+  // Custom "Hours as written" ALWAYS takes priority over the fixed timing-bucket tags —
+  // if hours text is filled in, that's the only time indicator shown (via the clock-icon line below),
+  // so the card never shows two conflicting time ranges at once.
+  const timingTags = (p.hours && p.hours.trim())
+    ? ''
+    : mergedTimingLabels(p.timings).map(label=>`<span class="time-tag">${escapeHtml(label)}</span>`).join('');
   const priceTag = p.price ? `<span class="price-tag">${escapeHtml(p.price)}</span>` : '';
   const paymentTag = p.payment ? `<span class="payment-tag">${escapeHtml(p.payment)}</span>` : '';
   const hoursLine = p.hours ? `<div class="hours-line">⏱ ${escapeHtml(p.hours)}</div>` : '';
   const locationLine = exactLoc ? `<div class="hours-line">📍 ${exactLoc}</div>` : '';
   const instagramLine = p.instagram ? `<div class="hours-line">📷 <a href="${escapeAttr(p.instagram)}" target="_blank" rel="noopener noreferrer" style="color:var(--search-accent);">View on Instagram</a></div>` : '';
   const uspLine = p.usp ? `<div class="usp-line"><strong>Must Try:</strong> ${escapeHtml(p.usp)}</div>` : '';
-  const mapIcon = p.maplink ? ` <a href="${escapeAttr(p.maplink)}" target="_blank" rel="noopener noreferrer" class="map-icon-link" title="Open in Google Maps">📍 Map</a>` : '';
+  const mapIcon = p.maplink ? ` <a href="${escapeAttr(p.maplink)}" target="_blank" rel="noopener noreferrer" class="map-icon-link" title="Open in Google Maps">📍 Open in Google Maps</a>` : '';
 
   let dietTag = '';
   if(p.diet === 'Veg') dietTag = `<span class="diet-tag veg">VEG</span>`;
@@ -2622,18 +2679,32 @@ function buildCard(p, branches){
   const altResult = findClosestAlternative(p);
   if(altResult){
     const alt = altResult.place;
-    altLine = `<div class="alt-line">Alternative nearby: <a href="#" data-alt="${escapeAttr(alt.name || '')}">${escapeHtml(alt.name || '(unnamed)')} (${escapeHtml(alt.area)})</a></div>`;
+    altLine = `<div class="alt-line">Alternative nearby: <a href="#" data-alt-id="${escapeAttr(alt.id)}">${escapeHtml(alt.name || '(unnamed)')} (${escapeHtml(alt.area)})</a></div>`;
   }
 
   let branchesBox = '';
   if(branches.length){
-    const rows = branches.map(b=>{
+    const rows = branches.map((b, idx)=>{
+      const detailId = `bdetail-${p.id}-${idx}`;
       const bLoc = b.location ? `, ${escapeHtml(b.location)}` : '';
-      const bHours = b.hours ? ` — ${escapeHtml(b.hours)}` : '';
-      const bMap = b.maplink ? ` · <a href="${escapeAttr(b.maplink)}" target="_blank" rel="noopener noreferrer">Map</a>` : '';
-      return `<div class="branch-row">${escapeHtml(b.area)}${bLoc}${bHours}${bMap}</div>`;
+      const bHoursShort = (b.hours && b.hours.trim()) ? b.hours : (mergedTimingLabels(b.timings)[0] || '');
+      const bUsp = b.usp ? `<div class="usp-line"><strong>Must Try:</strong> ${escapeHtml(b.usp)}</div>` : '';
+      const bMapLine = b.maplink ? `<div class="hours-line">📍 <a href="${escapeAttr(b.maplink)}" target="_blank" rel="noopener noreferrer" style="color:var(--search-accent);">Open in Google Maps</a></div>` : '';
+      const bHoursLine = b.hours ? `<div class="hours-line">⏱ ${escapeHtml(b.hours)}</div>` : '';
+      const bHy = b.hygiene || {};
+      const bHyEntries = [
+        ['Kitchen', bHy.kitchen], ['Tables', bHy.tables], ['Glasses', bHy.glass],
+        ['Floor', bHy.floor], ['Toilet', bHy.toilet], ['Staff', bHy.staff], ['Service', bHy.service],
+      ].filter(([,v])=> v !== null && v !== undefined && v !== "");
+      const bHygieneBox = bHyEntries.length ? `<div class="hygiene-box"><p class="hygiene-label">Hygiene</p><div class="hygiene-grid">${
+        bHyEntries.map(([label,val])=>`<div class="hygiene-row"><span>${label}</span><span>${val}</span></div>`).join('')
+      }</div></div>` : '';
+      const bNote = b.note ? `<div class="note">${escapeHtml(b.note)}</div>` : '';
+      return `
+        <div class="branch-row" data-toggle="${detailId}">${escapeHtml(b.area)}${bLoc}${bHoursShort ? ` — ${escapeHtml(bHoursShort)}` : ''} <span class="branch-expand">Details ▾</span></div>
+        <div class="branch-detail" id="${detailId}" style="display:none;">${bUsp}${bHoursLine}${bMapLine}${bNote}${bHygieneBox}</div>`;
     }).join('');
-    branchesBox = `<div class="branches-box"><p class="branches-label">Branches (${branches.length})</p>${rows}</div>`;
+    branchesBox = `<div class="branches-box"><p class="branches-label">${branches.length} more branch${branches.length===1?'':'es'}</p>${rows}</div>`;
   }
 
   const adminButtons = isAdmin ? `
@@ -2669,10 +2740,19 @@ function buildCard(p, branches){
   if(chainEl){
     chainEl.addEventListener('click', ()=>{ els.search.value = chainEl.dataset.chain; render(); window.scrollTo({top:0, behavior:'smooth'}); });
   }
-  const altEl = card.querySelector('[data-alt]');
+  const altEl = card.querySelector('[data-alt-id]');
   if(altEl){
-    altEl.addEventListener('click', (e)=>{ e.preventDefault(); els.search.value = altEl.dataset.alt; render(); window.scrollTo({top:0, behavior:'smooth'}); });
+    altEl.addEventListener('click', (e)=>{ e.preventDefault(); jumpToPlace(altEl.dataset.altId); });
   }
+  card.querySelectorAll('[data-toggle]').forEach(row=>{
+    row.addEventListener('click', ()=>{
+      const detail = card.querySelector('#' + CSS.escape(row.dataset.toggle));
+      if(!detail) return;
+      const show = detail.style.display === 'none';
+      detail.style.display = show ? 'block' : 'none';
+      row.classList.toggle('expanded', show);
+    });
+  });
   if(isAdmin){
     card.querySelector('[data-action="edit"]').addEventListener('click', ()=>openEdit(p.id));
     card.querySelector('[data-action="duplicate"]').addEventListener('click', ()=>duplicatePlace(p.id));
