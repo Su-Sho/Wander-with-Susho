@@ -2646,7 +2646,8 @@ function buildCard(p, branches){
   const paymentTag = p.payment ? `<span class="payment-tag">${escapeHtml(p.payment)}</span>` : '';
   const hoursLine = p.hours ? `<div class="hours-line">⏱ ${escapeHtml(p.hours)}</div>` : '';
   const locationLine = exactLoc ? `<div class="hours-line">📍 ${exactLoc}</div>` : '';
-  const instagramLine = p.instagram ? `<div class="hours-line">📷 <a href="${escapeAttr(p.instagram)}" target="_blank" rel="noopener noreferrer" style="color:var(--search-accent);">View on Instagram</a></div>` : '';
+  const instagramIconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>`;
+  const instagramLine = p.instagram ? `<div class="hours-line">${instagramIconSvg} <a href="${escapeAttr(p.instagram)}" target="_blank" rel="noopener noreferrer" style="color:var(--search-accent);">View on Instagram</a></div>` : '';
   const uspLine = p.usp ? `<div class="usp-line"><strong>Must Try:</strong> ${escapeHtml(p.usp)}</div>` : '';
   const mapIcon = p.maplink ? ` <a href="${escapeAttr(p.maplink)}" target="_blank" rel="noopener noreferrer" class="map-icon-link" title="Open in Google Maps">📍 Open in Google Maps</a>` : '';
 
@@ -2676,10 +2677,13 @@ function buildCard(p, branches){
   }
 
   let altLine = '';
-  const altResult = findClosestAlternative(p);
-  if(altResult){
-    const alt = altResult.place;
-    altLine = `<div class="alt-line">Alternative nearby: <a href="#" data-alt-id="${escapeAttr(alt.id)}">${escapeHtml(alt.name || '(unnamed)')} (${escapeHtml(alt.area)})</a></div>`;
+  const SHOW_ALTERNATIVE_NEARBY = false; // set to true to bring back the "Alternative nearby" line
+  if(SHOW_ALTERNATIVE_NEARBY){
+    const altResult = findClosestAlternative(p);
+    if(altResult){
+      const alt = altResult.place;
+      altLine = `<div class="alt-line">Alternative nearby: <a href="#" data-alt-id="${escapeAttr(alt.id)}">${escapeHtml(alt.name || '(unnamed)')} (${escapeHtml(alt.area)})</a></div>`;
+    }
   }
 
   let branchesBox = '';
