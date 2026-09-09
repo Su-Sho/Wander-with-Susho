@@ -1,0 +1,2806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wander with SuSho</title>
+<style>
+  :root{
+    --bg: #FBF6EC;
+    --ink: #22201B;
+    --ink-soft: #5A5347;
+
+    --search-bg: #E4EFEC;
+    --search-border: #A9CFC4;
+    --search-accent: #14594A;
+
+    --filter-bg: #FCEEDD;
+    --filter-border: #E7C393;
+    --filter-accent: #9C5A1E;
+
+    --card-bg: #FFFFFF;
+    --card-border: #E9E1D0;
+    --card-accent: #B0472B;
+
+    --add-bg: #EAEEF6;
+    --add-border: #C2CBE0;
+    --add-accent: #33456B;
+  }
+  *{box-sizing:border-box;}
+  @media (min-width:820px){
+    .wrap{max-width:1080px;}
+    #results{
+      column-count:2;
+      column-gap:16px;
+    }
+    #results .card, #results .letter-heading{
+      break-inside:avoid;
+    }
+  }
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family: Georgia, 'Iowan Old Style', serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:900px;margin:0 auto;padding:22px 16px 80px;}
+
+  header{padding:6px 4px 20px;margin-bottom:16px;}
+  .eyebrow{
+    font-family:'Courier New', monospace;
+    font-size:11px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--card-accent);
+    margin:0 0 6px;
+  }
+  h1{font-size:28px;margin:0 0 6px;font-weight:700;color:var(--ink);}
+  .sub{font-family:Georgia,serif;font-style:italic;color:var(--ink-soft);font-size:14.5px;margin:0;}
+
+  button{
+    font-family:'Courier New',monospace;
+    font-size:12px;
+    letter-spacing:.04em;
+    cursor:pointer;
+    border-radius:8px;
+    padding:9px 14px;
+    border:1px solid transparent;
+  }
+  .btn-primary{background:var(--add-accent);color:#FFFFFF;border-color:var(--add-accent);font-weight:bold;}
+  .btn-ghost{background:#FFFFFF;color:var(--ink-soft);border:1px solid var(--card-border);}
+  .btn-danger{background:#FFFFFF;color:#8A3B2B;border:1px solid #E0B7A6;}
+  .btn-small{padding:5px 10px;font-size:10.5px;}
+
+  .add-toggle-row{margin-bottom:14px;}
+
+  /* SEARCH ZONE */
+  .search-panel{
+    background:var(--search-bg);
+    border:1px solid var(--search-border);
+    border-radius:14px;
+    padding:14px;
+    margin-bottom:12px;
+    position:sticky;
+    top:10px;
+    z-index:5;
+  }
+  .search-row{position:relative;display:flex;align-items:center;}
+  input[type="text"], input[type="number"]{
+    width:100%;
+    padding:11px 14px 11px 34px;
+    border-radius:9px;
+    border:1px solid var(--search-border);
+    background:#FFFFFF;
+    color:var(--ink);
+    font-family:'Courier New',monospace;
+    font-size:14px;
+  }
+  input[type="text"]::placeholder{color:#7C8F82;}
+  .search-row::before{
+    content:"⌕";
+    position:absolute;
+    left:12px;
+    top:50%;
+    transform:translateY(-50%);
+    color:var(--search-accent);
+    font-size:16px;
+  }
+  .search-clear-btn{
+    position:absolute;
+    right:6px;
+    top:50%;
+    transform:translateY(-50%);
+    background:var(--search-accent);
+    color:#fff;
+    border:none;
+    border-radius:6px;
+    padding:5px 9px;
+    font-size:10.5px;
+    display:none;
+  }
+  .search-clear-btn.show{display:block;}
+
+  .zone-label{
+    font-family:'Courier New',monospace;
+    font-size:10px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    margin:0 0 7px 2px;
+    font-weight:bold;
+  }
+  .search-panel .zone-label{color:var(--search-accent);}
+  .filter-panel .zone-label{color:var(--filter-accent);}
+  .add-panel .zone-label{color:var(--add-accent);}
+  .sub-label{
+    font-family:'Courier New',monospace;
+    font-size:9.5px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--filter-accent);
+    opacity:.75;
+    margin:10px 0 6px 2px;
+  }
+
+  /* FILTER ZONE */
+  .filter-panel{
+    background:var(--filter-bg);
+    border:1px solid var(--filter-border);
+    border-radius:14px;
+    padding:14px;
+    margin-bottom:18px;
+  }
+  .select-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+  select{
+    width:100%;
+    padding:11px 12px;
+    border-radius:9px;
+    border:1px solid var(--filter-border);
+    background:#FFFFFF;
+    color:var(--ink);
+    font-family:'Courier New',monospace;
+    font-size:13px;
+    appearance:none;
+    -webkit-appearance:none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--filter-accent) 50%), linear-gradient(135deg, var(--filter-accent) 50%, transparent 50%);
+    background-position: calc(100% - 18px) calc(1em + 2px), calc(100% - 13px) calc(1em + 2px);
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+  }
+  .chips{display:flex;flex-wrap:wrap;gap:7px;}
+  .chip{
+    font-family:'Courier New',monospace;
+    font-size:11.5px;
+    letter-spacing:.03em;
+    padding:6px 11px;
+    border-radius:999px;
+    border:1px solid var(--filter-border);
+    background:#FFFFFF;
+    color:var(--filter-accent);
+    cursor:pointer;
+    user-select:none;
+    transition:.15s;
+  }
+  .chip.active{background:var(--filter-accent);border-color:var(--filter-accent);color:#FFFFFF;font-weight:bold;}
+  .filter-chip-btn{
+    font-family:'Courier New',monospace;
+    font-size:11.5px;
+    letter-spacing:.03em;
+    padding:6px 11px;
+    border-radius:999px;
+    border:1px solid var(--filter-border);
+    background:#FFFFFF;
+    color:var(--filter-accent);
+    cursor:pointer;
+  }
+  .diet-tag{
+    font-family:'Courier New',monospace;
+    font-size:11px;
+    font-weight:bold;
+    padding:2px 9px;
+    border-radius:999px;
+    white-space:nowrap;
+  }
+  .diet-tag.veg{background:#E3F3E3;color:#1E6B1E;border:1px solid #9FCB9F;}
+  .diet-tag.nonveg{background:#FBE4E1;color:#A32D2D;border:1px solid #E8B3AC;}
+  .halal-tag{
+    font-family:'Courier New',monospace;
+    font-size:10.5px;
+    padding:2px 8px;
+    border-radius:999px;
+    white-space:nowrap;
+    background:#EAF3DE;
+    color:#3B6D11;
+    border:1px solid #C0DD97;
+  }
+  .pork-tag{
+    font-family:'Courier New',monospace;
+    font-size:10.5px;
+    padding:2px 8px;
+    border-radius:999px;
+    white-space:nowrap;
+    background:#FAEEDA;
+    color:#854F0B;
+    border:1px solid #EF9F27;
+  }
+  .branches-box{
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px dashed var(--card-border);
+  }
+  .branches-label{
+    font-family:'Courier New',monospace;
+    font-size:10px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin:0 0 6px;
+  }
+  .branch-row{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    padding:4px 0;
+    border-bottom:1px dashed var(--card-border);
+  }
+  .branch-row:last-child{border-bottom:none;}
+  .branch-row a{color:var(--search-accent);}
+  .clear-chips-btn{
+    font-family:'Courier New',monospace;
+    font-size:10px;
+    color:var(--filter-accent);
+    background:none;
+    border:none;
+    text-decoration:underline;
+    padding:4px 0 0 2px;
+    cursor:pointer;
+  }
+
+  /* ADD/EDIT ZONE */
+  .add-panel{
+    background:var(--add-bg);
+    border:1px solid var(--add-border);
+    border-radius:14px;
+    padding:16px;
+    margin-bottom:18px;
+    display:none;
+  }
+  .add-panel.open{display:block;}
+  .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+  .field{display:flex;flex-direction:column;gap:4px;position:relative;}
+  .field.full{grid-column:1 / -1;}
+  .suggest-list{
+    position:absolute;
+    top:100%;
+    left:0;
+    right:0;
+    margin-top:2px;
+    background:#FFFFFF;
+    border:1px solid var(--add-border);
+    border-radius:8px;
+    max-height:180px;
+    overflow-y:auto;
+    z-index:30;
+    box-shadow:0 6px 16px rgba(0,0,0,0.12);
+    display:none;
+  }
+  .suggest-list.open{display:block;}
+  .suggest-item{
+    padding:8px 10px;
+    font-family:'Courier New',monospace;
+    font-size:12.5px;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  .suggest-item:hover, .suggest-item.highlighted{background:var(--add-bg);}
+  .field label{
+    font-family:'Courier New',monospace;
+    font-size:10px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--add-accent);
+  }
+  .field input, .field textarea, .field select{
+    padding:9px 10px;
+    border-radius:8px;
+    border:1px solid var(--add-border);
+    background:#FFFFFF;
+    color:var(--ink);
+    font-family:'Courier New',monospace;
+    font-size:13px;
+    width:100%;
+  }
+  .field textarea{resize:vertical;min-height:50px;font-family:Georgia,serif;}
+  .form-chip{
+    font-family:'Courier New',monospace;
+    font-size:11px;
+    padding:6px 10px;
+    border-radius:999px;
+    border:1px solid var(--add-border);
+    background:#FFFFFF;
+    color:var(--add-accent);
+    cursor:pointer;
+  }
+  .form-chip.active{background:var(--add-accent);border-color:var(--add-accent);color:#fff;font-weight:bold;}
+  .add-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px;}
+  .save-status{font-family:'Courier New',monospace;font-size:11px;color:var(--add-accent);margin-top:8px;min-height:14px;}
+
+  /* LISTING ZONE */
+  .count{
+    font-family:'Courier New',monospace;
+    font-size:11px;
+    color:var(--card-accent);
+    letter-spacing:.05em;
+    margin:2px 0 14px;
+    text-transform:uppercase;
+  }
+  .letter-heading{
+    font-family:'Courier New',monospace;
+    color:var(--card-accent);
+    font-size:12px;
+    letter-spacing:.15em;
+    border-bottom:1px dashed var(--card-border);
+    padding-bottom:5px;
+    margin:22px 0 10px;
+  }
+  .letter-heading:first-of-type{margin-top:0;}
+  .card{
+    background:var(--card-bg);
+    border:1px solid var(--card-border);
+    border-left:4px solid var(--card-accent);
+    border-radius:10px;
+    padding:14px 16px;
+    margin-bottom:10px;
+  }
+  .card-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;}
+  .name{font-size:17px;font-weight:700;color:var(--ink);}
+  .tag-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px;}
+  .loc-tag{
+    font-family:'Courier New',monospace;
+    font-size:11px;
+    color:var(--search-accent);
+    background:rgba(46,93,77,0.12);
+    border:1px solid var(--search-border);
+    padding:2px 8px;
+    border-radius:999px;
+    white-space:nowrap;
+  }
+  .price-tag{
+    font-family:'Courier New',monospace;
+    font-size:11px;
+    padding:2px 8px;
+    border-radius:999px;
+    white-space:nowrap;
+    border:1px solid var(--add-border);
+    color:var(--add-accent);
+    background:rgba(46,78,112,0.10);
+  }
+  .time-tag{
+    font-family:'Courier New',monospace;
+    font-size:10.5px;
+    padding:2px 8px;
+    border-radius:999px;
+    white-space:nowrap;
+    border:1px solid var(--filter-border);
+    color:var(--filter-accent);
+    background:rgba(95,68,112,0.08);
+  }
+  .chain-tag{
+    font-family:'Courier New',monospace;
+    font-size:11px;
+    padding:2px 8px;
+    border-radius:999px;
+    white-space:nowrap;
+    border:1px solid var(--card-accent);
+    color:var(--card-accent);
+    background:transparent;
+    cursor:pointer;
+  }
+  .payment-tag{
+    font-family:'Courier New',monospace;
+    font-size:11px;
+    padding:2px 8px;
+    border-radius:999px;
+    white-space:nowrap;
+    border:1px solid var(--search-border);
+    color:var(--search-accent);
+    background:rgba(20,89,74,0.08);
+  }
+  .usp-line{
+    font-family: Georgia, serif;
+    font-style:italic;
+    font-size:13px;
+    color:var(--ink-soft);
+    margin-top:6px;
+  }
+  .alt-line{
+    font-family:'Courier New',monospace;
+    font-size:11.5px;
+    color:var(--ink-soft);
+    margin-top:8px;
+    padding-top:8px;
+    border-top:1px dashed var(--card-border);
+  }
+  .alt-line a{color:var(--card-accent);}
+  .hygiene-box{
+    margin-top:8px;
+    padding-top:8px;
+    border-top:1px dashed var(--card-border);
+  }
+  .hygiene-label{
+    font-family:'Courier New',monospace;
+    font-size:10px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin:0 0 5px;
+  }
+  .hygiene-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:4px 12px;
+  }
+  .hygiene-row{
+    display:flex;
+    justify-content:space-between;
+    font-size:12px;
+  }
+  .hygiene-row span:last-child{font-weight:bold;}
+  .cat-tag{
+    font-family:'Courier New',monospace;
+    font-size:10px;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    color:var(--card-accent);
+    margin-top:6px;
+    display:inline-block;
+  }
+  .hours-line{
+    font-family:'Courier New',monospace;
+    font-size:11.5px;
+    color:var(--ink-soft);
+    margin-top:5px;
+  }
+  .note{
+    color:var(--ink-soft);
+    font-size:13.5px;
+    margin-top:6px;
+    line-height:1.5;
+    font-family: Georgia, serif;
+    white-space:pre-wrap;
+  }
+  .card-actions{display:flex;gap:6px;margin-top:10px;}
+
+  .empty{text-align:center;padding:50px 20px;color:var(--ink-soft);font-family:'Courier New',monospace;font-size:13px;}
+  .empty .big{font-size:28px;display:block;margin-bottom:10px;}
+  .loading-msg{text-align:center;padding:60px 20px;color:var(--ink-soft);font-family:'Courier New',monospace;font-size:13px;}
+
+  .toast{
+    position:fixed;
+    bottom:24px;
+    left:50%;
+    transform:translateX(-50%) translateY(20px);
+    background:var(--add-accent);
+    color:#fff;
+    font-family:'Courier New',monospace;
+    font-size:13px;
+    padding:10px 18px;
+    border-radius:999px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.25);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s ease, transform .25s ease;
+    z-index:50;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  ::selection{background:var(--filter-accent);color:#fff;}
+</style>
+<style>
+  .auth-bar{
+    display:flex;
+    justify-content:flex-end;
+    align-items:center;
+    gap:8px;
+    margin-bottom:10px;
+    font-family:'Courier New',monospace;
+    font-size:12px;
+  }
+  .auth-status{color:var(--ink-soft);}
+  .login-panel{
+    background:var(--add-bg);
+    border:1px solid var(--add-border);
+    border-radius:14px;
+    padding:14px;
+    margin-bottom:14px;
+    display:none;
+  }
+  .login-panel.open{display:block;}
+  .login-panel input{
+    width:100%;
+    padding:9px 10px;
+    border-radius:8px;
+    border:1px solid var(--add-border);
+    background:#FFFFFF;
+    color:var(--ink);
+    font-family:'Courier New',monospace;
+    font-size:13px;
+    margin-bottom:8px;
+  }
+  .sync-badge{
+    font-family:'Courier New',monospace;
+    font-size:10.5px;
+    color:var(--search-accent);
+  }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Suhail Shoukath's</p>
+    <h1>Wander with SuSho</h1>
+    <p class="sub">Eat, Explore, Experience.</p>
+  </header>
+
+  <div class="auth-bar">
+    <span class="auth-status" id="authStatus">Checking…</span>
+    <button class="btn-ghost btn-small" id="loginToggleBtn">Admin Login</button>
+    <button class="btn-ghost btn-small" id="logoutBtn" style="display:none;">Log Out</button>
+  </div>
+
+  <div class="login-panel" id="loginPanel">
+    <p class="zone-label" style="color:var(--add-accent);">Admin Login</p>
+    <input type="email" id="loginEmail" placeholder="Email">
+    <input type="password" id="loginPassword" placeholder="Password">
+    <div class="add-actions">
+      <button class="btn-ghost" id="loginCancelBtn">Cancel</button>
+      <button class="btn-primary" id="loginSubmitBtn">Log In</button>
+    </div>
+    <div class="save-status" id="loginStatus"></div>
+  </div>
+
+  <div class="add-toggle-row" id="adminControls" style="display:none;">
+    <button class="btn-primary" id="toggleAddBtn">+ Add a Place</button>
+    <button class="btn-ghost" id="importSeedBtn" style="margin-left:8px;">Import Starter Data (run once)</button>
+  </div>
+
+  <div class="add-panel" id="addPanel">
+    <p class="zone-label" id="addPanelTitle">Add a New Place</p>
+    <div class="field-grid">
+      <div class="field">
+        <label>State <span style="opacity:.6;">*</span></label>
+        <select id="f_state"></select>
+        <input type="text" id="f_state_new" class="new-value-input" placeholder="Enter new state name" style="display:none;margin-top:6px;">
+      </div>
+      <div class="field">
+        <label>District <span style="opacity:.6;">*</span></label>
+        <select id="f_district"></select>
+        <input type="text" id="f_district_new" class="new-value-input" placeholder="Enter new district name" style="display:none;margin-top:6px;">
+      </div>
+      <div class="field">
+        <label>Area / Locality <span style="opacity:.6;">*</span></label>
+        <select id="f_area"></select>
+        <input type="text" id="f_area_new" class="new-value-input" placeholder="Enter new area name" style="display:none;margin-top:6px;">
+      </div>
+      <div class="field">
+        <label>Exact Location (within Area)</label>
+        <select id="f_location"></select>
+        <input type="text" id="f_location_new" class="new-value-input" placeholder="Enter new location name" style="display:none;margin-top:6px;">
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <select id="f_category"></select>
+        <input type="text" id="f_category_new" class="new-value-input" placeholder="Enter new category" style="display:none;margin-top:6px;">
+      </div>
+      <div class="field">
+        <label>Price Level</label>
+        <select id="f_price">
+          <option value="">— Select —</option>
+          <option value="Budget">Budget</option>
+          <option value="Premium">Premium</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Hours (as written, e.g. split shifts)</label>
+        <input type="text" id="f_hours" placeholder="e.g. 7 AM–12 PM, 4 PM–7 PM">
+      </div>
+      <div class="field">
+        <label>Distance from Area (km)</label>
+        <input type="number" id="f_distance" step="0.1" min="0" placeholder="e.g. 1.5">
+      </div>
+      <div class="field full">
+        <label>Google Maps Link</label>
+        <input type="text" id="f_maplink" placeholder="Paste the share link from Google Maps">
+      </div>
+      <div class="field">
+        <label>Chain / Brand Name (for branches)</label>
+        <input type="text" id="f_chain" placeholder="e.g. Milano Ice Cream — leave blank if not a chain">
+      </div>
+      <div class="field">
+        <label>Payment Accepted</label>
+        <select id="f_payment">
+          <option value="">— Select —</option>
+          <option value="Cash Only">Cash Only</option>
+          <option value="Cash & Online">Cash & Online</option>
+          <option value="Online Only">Online Only</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Diet Type</label>
+        <select id="f_diet">
+          <option value="">— Select —</option>
+          <option value="Veg">Veg</option>
+          <option value="Non-Veg">Non-Veg</option>
+        </select>
+      </div>
+      <div class="field" id="f_halal_wrap" style="display:none;">
+        <label>Halal?</label>
+        <select id="f_halal">
+          <option value="">— Select —</option>
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
+        </select>
+      </div>
+      <div class="field" id="f_pork_wrap" style="display:none;">
+        <label>Serves Pork?</label>
+        <select id="f_pork">
+          <option value="">— Select —</option>
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
+        </select>
+      </div>
+      <div class="field full">
+        <label>Name (optional)</label>
+        <input type="text" id="f_name" placeholder="Spot name — you can add this later">
+      </div>
+      <div class="field full">
+        <label>USP — what makes this place stand out</label>
+        <input type="text" id="f_usp" placeholder="e.g. Smoked beef ribs, 12-hour marinade">
+      </div>
+      <div class="field full">
+        <label>When is it open? (tap all that apply)</label>
+        <div class="chips" id="formTimingChips"></div>
+      </div>
+      <div class="field full">
+        <label>Instagram Link</label>
+        <input type="text" id="f_instagram" placeholder="e.g. https://instagram.com/placename">
+      </div>
+      <div class="field full">
+        <label>Hygiene Ratings (1–5, leave blank if unrated)</label>
+        <div class="field-grid" style="margin-top:6px;">
+          <div class="field"><label>Kitchen</label><input type="number" id="h_kitchen" min="1" max="5" step="0.5"></div>
+          <div class="field"><label>Tables</label><input type="number" id="h_tables" min="1" max="5" step="0.5"></div>
+          <div class="field"><label>Glasses</label><input type="number" id="h_glass" min="1" max="5" step="0.5"></div>
+          <div class="field"><label>Floor</label><input type="number" id="h_floor" min="1" max="5" step="0.5"></div>
+          <div class="field"><label>Toilet</label><input type="number" id="h_toilet" min="1" max="5" step="0.5"></div>
+          <div class="field"><label>Staff Behaviour</label><input type="number" id="h_staff" min="1" max="5" step="0.5"></div>
+          <div class="field"><label>Service</label><input type="number" id="h_service" min="1" max="5" step="0.5"></div>
+        </div>
+      </div>
+      <div class="field full">
+        <label>Note</label>
+        <textarea id="f_note" placeholder="What to order, timing, tips…"></textarea>
+      </div>
+    </div>
+    <div class="add-actions">
+      <button class="btn-ghost" id="cancelAddBtn">Cancel</button>
+      <button class="btn-primary" id="saveAddBtn">Save Place</button>
+    </div>
+    <div class="save-status" id="saveStatus"></div>
+  </div>
+
+  <div class="search-panel">
+    <p class="zone-label">Search</p>
+    <div class="search-row">
+      <input type="text" id="search" placeholder="Search a name, dish, or area…">
+      <button class="search-clear-btn" id="searchClearBtn">Clear</button>
+    </div>
+  </div>
+
+  <div class="filter-panel">
+    <p class="zone-label">Filter</p>
+    <div class="select-row">
+      <select id="stateFilter"></select>
+      <select id="districtFilter"></select>
+    </div>
+    <div class="select-row">
+      <select id="areaFilter"></select>
+      <select id="locationFilter"></select>
+    </div>
+    <div class="select-row" style="grid-template-columns:1fr;">
+      <select id="distanceFilter">
+        <option value="All">Distance from area: Any</option>
+        <option value="500m">Within 500 m</option>
+        <option value="1km">Within 1 km</option>
+        <option value="1-2km">1 – 2 km</option>
+        <option value="2-5km">2 – 5 km</option>
+        <option value="5-10km">5 – 10 km</option>
+      </select>
+    </div>
+
+    <p class="sub-label">Category</p>
+    <div class="chips" id="categoryChips"></div>
+
+    <p class="sub-label">Price</p>
+    <div class="chips" id="priceChips"></div>
+
+    <p class="sub-label">Diet</p>
+    <div class="chips" id="dietChips"></div>
+
+    <div class="chips" id="halalPorkChips" style="margin-top:6px;"></div>
+
+    <button class="filter-chip-btn" id="timingsToggleBtn" type="button" style="margin-top:10px;">Timings ▾</button>
+    <div id="timingsPanel" style="display:none;margin-top:8px;">
+      <div class="chips" id="timingChips"></div>
+      <button class="clear-chips-btn" id="clearTimingBtn">clear timing selection</button>
+    </div>
+  </div>
+
+  <div class="count" id="resultCount"></div>
+  <div id="results"><div class="loading-msg">Loading places…</div></div>
+
+</div>
+
+<div class="toast" id="toast">Entry Added</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAs-oDoo5yZ8OWdw5UBSClCQQOcBV-55A8",
+  authDomain: "wander-with-susho.firebaseapp.com",
+  projectId: "wander-with-susho",
+  storageBucket: "wander-with-susho.firebasestorage.app",
+  messagingSenderId: "292388972732",
+  appId: "1:292388972732:web:a0936252fd92950ec6c8b9",
+  measurementId: "G-THCJVFVW23"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const placesCol = db.collection('places');
+
+let PLACES = [];       // array of {id, ...fields}
+let isAdmin = false;
+let activeCategory = "All";
+let activePrice = "All";
+let activeDiet = "All";
+let activeHalal = "All";
+let excludePork = false;
+let activeTimings = new Set();
+let editingId = null;
+let formTimings = new Set();
+
+const SEED_DATA = [
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Fort Kochi",
+    "location": "",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Achukaas Chaya Kada",
+    "timings": [],
+    "note": "Beef chops, mutton chops, sawala bhaji.\n\nIn front of Boat Jetty"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Various",
+    "location": "",
+    "name": "Ann's Bakery",
+    "category": "Bakery",
+    "price": "Budget",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Fish sandwich, butter cake."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Fort Kochi",
+    "location": "",
+    "name": "Azurovy",
+    "category": "Food",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Restaurant."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Fort Kochi",
+    "location": "",
+    "name": "B for Biryani",
+    "category": "Food",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Biryani spot."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Fort Kochi",
+    "location": "",
+    "name": "Bafna House",
+    "category": "Stay/Sight",
+    "price": "",
+    "hours": "10 AM–5 PM",
+    "timings": [
+      "Morning",
+      "Afternoon"
+    ],
+    "distance_km": null,
+    "note": "Free entry."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kalamassery",
+    "location": "Container Road",
+    "category": "Seafood",
+    "price": "",
+    "hours": "",
+    "distance_km": null,
+    "name": "Mee Mee Restaurant",
+    "timings": [
+      "Afternoon",
+      "Night"
+    ],
+    "note": "Seafood restaurant.\nNear Toll"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Vytilla",
+    "location": "",
+    "category": "Food",
+    "price": "",
+    "hours": "",
+    "distance_km": null,
+    "name": "Cafe Utopia",
+    "timings": [],
+    "note": "try the kalanji pollichathu.\n\nPanangad, 30 min from Vytilla"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kathrikadav",
+    "location": "",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Chennai Dosa",
+    "timings": [],
+    "note": "Dosa spot."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Cherai / Munambam",
+    "location": "Beach Road, Paravur",
+    "name": "Chillout Cafe",
+    "category": "Cafe",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Cafe on the beach road."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Aluva",
+    "location": "",
+    "name": "Cinnamon Bakery",
+    "category": "Bakery",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Croissant sandwich."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kacheripady",
+    "location": "Near High Court",
+    "name": "Cleopatra Ship",
+    "category": "Activity",
+    "price": "Premium",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Kochi to Vembanad Lake kayaking, ₹999 incl. snacks & mini lunch."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Various",
+    "location": "",
+    "name": "Cochin Bakery",
+    "category": "Bakery",
+    "price": "Budget",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Mini snacks — chicken burger, mini samosa, and more."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Fort Kochi",
+    "location": "Mattancherry",
+    "name": "Coz Coffee",
+    "category": "Cafe",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Coffee spot."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kochi Outskirts",
+    "location": "",
+    "name": "Dawnage Club",
+    "category": "Activity",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Fitness meet, every Saturday."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Pallarivattom",
+    "location": "Padivattom",
+    "category": "Food",
+    "price": "",
+    "hours": "",
+    "distance_km": null,
+    "name": "Farsa Restaurant",
+    "timings": [],
+    "note": "Iranian grilled platter, meat."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kakkanad",
+    "location": "Seaport-Airport Road",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Frruitzy",
+    "timings": [],
+    "note": "Porotta burger."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "MG Road",
+    "location": "",
+    "name": "Hotel Sona",
+    "category": "Food",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Neypathiri, porotta, beef, beef stew, beef coconut olarthu."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "MG Road",
+    "location": "",
+    "name": "Hoy Punjab",
+    "category": "Food",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Mutton, chicken shami kabab, mutton buna ghosh, mutton haleem."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kochi Outskirts",
+    "location": "",
+    "name": "John's Village",
+    "category": "Activity",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "About 20 km from Kochi."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kochi Outskirts",
+    "location": "",
+    "name": "Kanjiramattom Mosque Kayaking",
+    "category": "Activity",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": 2,
+    "note": "Kayaking spot."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kaloor",
+    "location": "Jawaharlal Stadium",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Kalloor Kathrikadav",
+    "timings": [],
+    "note": "Elote kababs, mallai tikka."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kaloor",
+    "location": "Jawaharlal Stadium",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Kalloor Stadium Stall",
+    "timings": [],
+    "note": "Tavuk biryani, beef."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Willingdon Island",
+    "location": "",
+    "category": "Seafood",
+    "price": "Premium",
+    "hours": "",
+    "distance_km": null,
+    "name": "Karthyani",
+    "timings": [],
+    "note": "Seafood spot."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Holiday Inn Area",
+    "location": "Holiday Inn",
+    "name": "Kyra Restaurant",
+    "category": "Food",
+    "price": "Premium",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Greek & Persian fusion — 1.5-metre adana kabab, giant beef chops."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "MG Road",
+    "location": "",
+    "name": "Little Soy",
+    "category": "Food",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Sushi."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Panampilly Nagar",
+    "location": "",
+    "name": "Manna Restaurant",
+    "category": "Food",
+    "price": "",
+    "hours": "4 PM onward",
+    "timings": [
+      "Mid Evening"
+    ],
+    "distance_km": null,
+    "note": "Chicken kofta, available from 4 PM."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Fort Kochi",
+    "location": "",
+    "name": "Mai House",
+    "category": "Stay",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Place to stay."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Fort Kochi",
+    "location": "Mattancherry",
+    "name": "Mattancherry Walk",
+    "category": "Sight",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Old town area — heritage walk."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Fort Kochi",
+    "location": "Mattancherry",
+    "category": "Food",
+    "price": "",
+    "hours": "7 PM–12 AM",
+    "distance_km": 1.5,
+    "name": "Meet Mr. Meat",
+    "timings": [
+      "Night",
+      "Late Night"
+    ],
+    "note": "Beef ribs.\nAt Ammai Muk. 1.5 kms from Mattanchery Palace"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kaloor",
+    "location": "Jawaharlal Stadium",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Metro Food Hub",
+    "timings": [],
+    "note": "₹70 meals.\nBehind Jawaharlal Stadium"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Fort Kochi",
+    "location": "",
+    "name": "Noorya Erachi Chor",
+    "category": "Food",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Restaurant."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kacheripady",
+    "location": "",
+    "name": "Oji Ramen",
+    "category": "Food",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Japanese restaurant."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Fort Kochi",
+    "location": "",
+    "name": "Old Light House",
+    "category": "Sight",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Landmark."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Fort Kochi",
+    "location": "",
+    "name": "Opp. Francis Church",
+    "category": "Sight",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Landmark area."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kochi Outskirts",
+    "location": "",
+    "name": "Pottery & RC Gaming Cafe",
+    "category": "Activity",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Casual pottery and RC gaming spot."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kakkanad",
+    "location": "",
+    "name": "Qumqum Restaurant",
+    "category": "Food",
+    "price": "Premium",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Full goat mandhi — serves 8 to 12 people."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Pallarivattom",
+    "location": "",
+    "name": "Rappai's",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Chicken fry, porotta."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Pattipalam",
+    "location": "Pulivhode",
+    "name": "Saji Chettan Kada",
+    "category": "Food",
+    "price": "",
+    "hours": "6 AM–9:30 PM",
+    "timings": [
+      "Morning",
+      "Afternoon",
+      "Mid Evening",
+      "Night"
+    ],
+    "distance_km": null,
+    "note": "₹2000 spread, porotta."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Fort Kochi",
+    "location": "",
+    "name": "Seagull",
+    "category": "Food",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Restaurant."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Various",
+    "location": "",
+    "name": "Society Bakery",
+    "category": "Bakery",
+    "price": "Budget",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Chocolate cake, swan cake."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Pallarivattom",
+    "location": "",
+    "name": "Sweet Porotta — Jaya Bakery",
+    "category": "Bakery",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Sweet porotta."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kalamassery",
+    "location": "Cusat",
+    "category": "Activity",
+    "price": "",
+    "hours": "",
+    "distance_km": null,
+    "name": "Speedway Kochi",
+    "timings": [],
+    "note": "Go-karting."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Vytilla",
+    "location": "Ponnuruni",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "St. Joseph Chicken 65",
+    "timings": [],
+    "note": "Chicken 65.\n\nChalikot Road"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Willingdon Island",
+    "location": "Taj Hotel, Dolphin's Corner",
+    "name": "Taj Hotel — Seafood Grills",
+    "category": "Seafood",
+    "price": "Premium",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Unlimited grills."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Edapally",
+    "location": "",
+    "category": "Food",
+    "price": "Premium",
+    "hours": "",
+    "distance_km": null,
+    "name": "Tex and Mex",
+    "timings": [],
+    "note": "Pulled beef cooked over 20 hours, brisket."
+  },
+  {
+    "state": "Kerala",
+    "district": "Idukki",
+    "area": "Thodupuzha",
+    "location": "",
+    "name": "Thottapuram House",
+    "category": "Stay",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Has a swimming pool."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Fort Kochi",
+    "location": "",
+    "name": "Trouvaille",
+    "category": "Bakery",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Cheesecake."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kadavantara",
+    "location": "",
+    "name": "TDJ",
+    "category": "Food",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Eatery."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Fort Kochi",
+    "location": "",
+    "category": "Activity",
+    "price": "",
+    "hours": "",
+    "distance_km": null,
+    "name": "Typewriting on Postcard",
+    "timings": [],
+    "note": "Postcard typewriting experience.\n\nNear Paragon Hotel"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Maradu",
+    "location": "",
+    "category": "Activity",
+    "price": "",
+    "hours": "",
+    "distance_km": null,
+    "name": "Valandakkad Water Cycling",
+    "timings": [],
+    "note": "Water cycling.\n\n2km from Forum mall"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Fort Kochi",
+    "location": "",
+    "name": "Vasco Da Gama House",
+    "category": "Stay",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Heritage house to stay."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kalamassery",
+    "location": "Container Road",
+    "category": "Seafood",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Vellekanthari",
+    "timings": [
+      "Afternoon",
+      "Mid Evening"
+    ],
+    "note": "Seafood spot.\nNear Toll"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kochi Outskirts",
+    "location": "",
+    "name": "Vypin Kozhupilly",
+    "category": "Sight",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "River-like spot."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kochi Outskirts",
+    "location": "",
+    "name": "Kapprikad — Abhirayani Eco Tourism",
+    "category": "Activity",
+    "price": "",
+    "hours": "",
+    "timings": [],
+    "distance_km": null,
+    "note": "Elephant camp, about 1 hr from Kochi."
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kalamassery",
+    "location": "",
+    "category": "Cafe",
+    "price": "",
+    "hours": "",
+    "distance_km": null,
+    "name": "GVQ Cafe",
+    "timings": [],
+    "note": "Hourly rate cafe.\nFirst hour 150 per head, subsequent 60 rupees.\nUnlimited tea and biscuits"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Pallarivattom",
+    "location": "Padivattom",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Bachika",
+    "timings": [
+      "Morning",
+      "Afternoon",
+      "Mid Evening",
+      "Night",
+      "Late Night"
+    ],
+    "note": "Beef biryani\nLive porotta and pricha pathiri"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Edapally",
+    "location": "Pathadipalam",
+    "category": "Seafood",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Ila Kochi",
+    "timings": [
+      "Afternoon",
+      "Night"
+    ],
+    "note": "Seafood, Pazham kanji, Kalanji or Karimeen tawa fry, prawns"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kathrikadav",
+    "location": "",
+    "category": "Seafood",
+    "price": "",
+    "hours": "",
+    "distance_km": null,
+    "name": "Machlis",
+    "timings": [
+      "Afternoon",
+      "Night"
+    ],
+    "note": "Seafood, meals, bun porotta"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Edapally",
+    "location": "Pathadipalam",
+    "category": "Bakery",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Royal Bakers",
+    "timings": [
+      "Morning",
+      "Afternoon",
+      "Mid Evening",
+      "Night"
+    ],
+    "note": "Egg puffs, Cutlet, Tea"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Perumbavoor",
+    "location": "",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Shafeekinde kada",
+    "timings": [],
+    "note": "Ghee rice beef fry"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Edapally",
+    "location": "Pathadipalam",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Tasty Trails",
+    "timings": [
+      "Night",
+      "Late Night"
+    ],
+    "note": "Appam, bread, stwe, beef, ghee rice.\nMetro pillar 334"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Maradu",
+    "location": "Pandavath",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "8 Am to 10 PM",
+    "distance_km": null,
+    "name": "Manglore foods",
+    "timings": [
+      "Morning",
+      "Afternoon",
+      "Mid Evening",
+      "Night"
+    ],
+    "note": "Ila idly, ila ada, Mangalore buns\n\nOpp ESAF Bank",
+    "instagram": ""
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kadavantara",
+    "location": "",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Yaghma Kababs",
+    "timings": [],
+    "note": "Malai tikka, chikken tikka, seek kabab\n\nKumarasan Nagar"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kalamassery",
+    "location": "Metro Pillars",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": 0.2,
+    "name": "Saleemka's Biryani",
+    "timings": [
+      "Morning",
+      "Afternoon",
+      "Mid Evening",
+      "Night"
+    ],
+    "note": "Chicken biryani\nChicken 65\nMutton Biryani\nGhee rice beef combo with dal\n\nMetro Piller 323",
+    "instagram": "https://www.instagram.com/reel/DcqRjcBJQdA/?igsi=MWo5MTY2dHRxcWppdw=="
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kalamassery",
+    "location": "",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": 1.5,
+    "name": "Hotel Time Pass",
+    "timings": [
+      "Morning",
+      "Afternoon",
+      "Mid Evening",
+      "Night"
+    ],
+    "note": "Chicken Fried rice\nChicken chilly\nChicken biryani\n\nVidhyanagar",
+    "instagram": "https://www.instagram.com/reel/Dc0JAY-TfZX/?igsi=MTVnNmJuaGo3bmJqNA=="
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kadavantara",
+    "location": "Jawahar Nagar",
+    "category": "Food",
+    "price": "Premium",
+    "hours": "",
+    "distance_km": null,
+    "name": "District 7",
+    "timings": [
+      "Morning",
+      "Afternoon",
+      "Mid Evening",
+      "Night"
+    ],
+    "note": "Hot Chocolate,\nClingy Chicken\nTurkish beef\nCoco cola brisket\nKorean chicken\n\nOzone gardens",
+    "instagram": "https://www.instagram.com/p/Da5VQqVgEMR/?igsi=dGZubnBjYjRuZzB1"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kalamassery",
+    "location": "HMT",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Paravana",
+    "timings": [
+      "Morning",
+      "Afternoon",
+      "Night",
+      "Mid Evening"
+    ],
+    "note": "Beef Biryani\nChicken Biryani",
+    "instagram": "https://www.instagram.com/reel/Dc0PGCRBIEc/?igsi=MXIwdXN0ZjZ0YTl6ZQ=="
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Aluva",
+    "location": "",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Shibithande thattukada",
+    "timings": [
+      "Afternoon",
+      "Mid Evening",
+      "Night"
+    ],
+    "note": "Erachi chor\nPorotta\nBeef curry\nDosa\nChilli chikken\n\nVidakuzha"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Maradu",
+    "location": "",
+    "category": "Seafood",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Ende veed veetile oon",
+    "timings": [
+      "Afternoon"
+    ],
+    "note": "Meals\nSeafood\n\nNear Nucleas mall",
+    "instagram": "https://www.instagram.com/reel/DbH8kdvh_2f/?igsi=MXh0c2VxMDA1cnBtOA=="
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "MG Road",
+    "location": "",
+    "category": "Seafood",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Sayooj",
+    "timings": [
+      "Afternoon"
+    ],
+    "note": "Meals for 50 with 10 items\nSeafood\nBeef curry\n\nSouth Ksrtc bus stand through pullepady bridge"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kacheripady",
+    "location": "Marine Drive",
+    "category": "Food",
+    "price": "Premium",
+    "hours": "",
+    "distance_km": null,
+    "name": "Rahmaniya",
+    "timings": [
+      "Morning",
+      "Afternoon",
+      "Mid Evening",
+      "Night"
+    ],
+    "note": "Chicken biryani\nMutton biryani"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kalamassery",
+    "location": "Container Road",
+    "category": "Seafood",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Kiza kitchen",
+    "timings": [
+      "Morning",
+      "Afternoon",
+      "Mid Evening",
+      "Night"
+    ],
+    "note": "Meals\nSeafood"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Pallarivattom",
+    "location": "Pipeline",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Demiglaze caters and bake house",
+    "timings": [
+      "Afternoon"
+    ],
+    "note": "Chicken biryani in a bicket. Good for 2"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kathrikadav",
+    "location": "",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Faizy's kitchen",
+    "timings": [
+      "Morning",
+      "Afternoon",
+      "Mid Evening"
+    ],
+    "note": "Breakfast\nHassan Mathar\nChicken allepey\nErachi chor\nGhee rice\nSamoosa Chicken and corn stuffed\nPorotta beef\n\nOpp Salafi Masjid"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kacheripady",
+    "location": "",
+    "category": "Activity",
+    "price": "",
+    "hours": "",
+    "distance_km": null,
+    "name": "Stratosphere",
+    "timings": [],
+    "note": "Gaming\nPool and snooker\n\nProvidence Road Tatapuram"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Aluva",
+    "location": "",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Nadan Thattukada",
+    "timings": [
+      "Morning",
+      "Afternoon",
+      "Mid Evening"
+    ],
+    "note": "Beef fry\nPorotta\nPuttu\n\nNear Seema's",
+    "instagram": "https://www.instagram.com/reel/Db2arSYyjVj/?igsi=MTdtN2gzbWx6ZmczMg=="
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Pallarivattom",
+    "location": "Thamanam",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Laffa Shack",
+    "timings": [
+      "Mid Evening",
+      "Night"
+    ],
+    "note": "Beef Shawarma\nChicken Shawarma",
+    "instagram": "https://www.instagram.com/reel/Dbfs7Z7pe9f/?igsi=MXhrdjNuOHV0cDJxcQ=="
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Pallarivattom",
+    "location": "",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Pathal",
+    "timings": [
+      "Afternoon"
+    ],
+    "note": "Kuttan Beef Biryani\nMutton Biryani\nChicken biryani",
+    "instagram": "https://www.instagram.com/reel/DcyaltRTBo_/?igsi=MTFqb2Rwa21wZzRvOA=="
+  },
+  {
+    "state": "Kerala",
+    "district": "Idukki",
+    "area": "Kattapana",
+    "location": "",
+    "category": "Stay",
+    "price": "",
+    "hours": "",
+    "distance_km": null,
+    "name": "Mystic Mayapott Resort",
+    "timings": [],
+    "note": "Beautiful small waterfalls\nGood food with fish meals, dinner and breakfast",
+    "instagram": "https://www.instagram.com/reel/Dcagf0Cxrtx/?igsi=MTJoYWJ3a3U2d3Rncg=="
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kalamassery",
+    "location": "HMT",
+    "category": "Cafe",
+    "price": "Premium",
+    "hours": "",
+    "distance_km": null,
+    "name": "Paul's Cafe",
+    "timings": [
+      "Morning",
+      "Afternoon",
+      "Mid Evening",
+      "Night"
+    ],
+    "note": "",
+    "instagram": "https://www.instagram.com/reel/DblKbGxP0LK/?igsi=a3oyaThhaThtN2h2"
+  },
+  {
+    "state": "Kerala",
+    "district": "Idukki",
+    "area": "Munnar",
+    "location": "",
+    "category": "Stay",
+    "price": "Premium",
+    "hours": "",
+    "distance_km": null,
+    "name": "Mountain Club Resort",
+    "timings": [],
+    "note": "Chinnakanal",
+    "instagram": "https://www.instagram.com/reel/DZSgC16pfNg/?igsi=MW93cGk2bnI2amc3bg=="
+  },
+  {
+    "state": "Kerala",
+    "district": "Idukki",
+    "area": "Munnar",
+    "location": "",
+    "category": "Stay",
+    "price": "Premium",
+    "hours": "",
+    "distance_km": null,
+    "name": "Chandy's drizzle drop",
+    "timings": [],
+    "note": "Scenic view\nWith food\n\nMunnar Top Station",
+    "instagram": "https://www.instagram.com/reel/DcUCAk0MrBk/?igsi=cTMyNHh6ZTB6dnR1"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Panampilly Nagar",
+    "location": "",
+    "category": "Food",
+    "price": "Premium",
+    "hours": "",
+    "distance_km": null,
+    "name": "Elam Restaurant",
+    "timings": [],
+    "note": "Coconut Milk and Pathiri\nPrawnBeef Roast",
+    "instagram": "https://www.instagram.com/reel/Dc6V6cBJ7gJ/?stkn=bzA1anh4c2dkenVv"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kalamassery",
+    "location": "Cusat",
+    "category": "Cafe",
+    "price": "",
+    "hours": "",
+    "distance_km": null,
+    "name": "Cafe OTT",
+    "timings": [],
+    "note": "University Road, Alfiya Nagar\nSouth Kalamassery",
+    "instagram": "https://www.instagram.com/reel/Dc2vYv6COVU/?stkn=OWEzc2JzYTgwNXhx"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Aluva",
+    "location": "",
+    "category": "Food",
+    "price": "Budget",
+    "hours": "",
+    "distance_km": null,
+    "name": "Khaif Chicken",
+    "timings": [
+      "Late Night",
+      "Night"
+    ],
+    "note": "Al Fahm\n\nThsikatukara, pipeline road",
+    "instagram": "https://www.instagram.com/reel/Dba9GYuvGNN/?stkn=MWRqaDNsZWM2c3I0NQ=="
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "MG Road",
+    "location": "Padma Junction",
+    "category": "Food",
+    "price": "Premium",
+    "hours": "",
+    "distance_km": null,
+    "name": "Shawarma Daddy",
+    "timings": [],
+    "note": "Shawarma\nChefs Mayo\nPadma Junction, Pullepady",
+    "instagram": "https://www.instagram.com/reel/Da7M9DfSt_h/?stkn=aGV0cHpkanY4ejhj"
+  },
+  {
+    "state": "Kerala",
+    "district": "Ernakulam",
+    "area": "Kalamassery",
+    "location": "",
+    "category": "Food",
+    "price": "",
+    "hours": "",
+    "distance_km": null,
+    "name": "Oishi",
+    "timings": [
+      "Afternoon",
+      "Mid Evening"
+    ],
+    "note": "Japanese snacks and drinks\nPiller 263\nNorth Kalamassery",
+    "instagram": "https://www.instagram.com/reel/DarmA0kTh2u/?stkn=eGY2NHN4Yzl5aHRy"
+  }
+];
+
+const TIMING_BUCKETS = [
+  {key:"Morning", label:"Morning (9–12)"},
+  {key:"Afternoon", label:"Afternoon (12–4)"},
+  {key:"Mid Evening", label:"Mid Evening (4–7)"},
+  {key:"Night", label:"Night (7–10)"},
+  {key:"Late Night", label:"Late Night (10–12)"},
+  {key:"Very Late Night", label:"Very Late Night (12–2 AM)"},
+  {key:"Early Morning", label:"Early Morning (2–4 AM)"},
+  {key:"24 Hours", label:"24 Hours"},
+];
+
+const TIMING_RANGES = {
+  "Morning": [9, 12], "Afternoon": [12, 16], "Mid Evening": [16, 19],
+  "Night": [19, 22], "Late Night": [22, 24], "Very Late Night": [24, 26],
+  "Early Morning": [26, 28],
+};
+
+const els = {
+  results: document.getElementById('results'),
+  count: document.getElementById('resultCount'),
+  search: document.getElementById('search'),
+  searchClearBtn: document.getElementById('searchClearBtn'),
+  stateFilter: document.getElementById('stateFilter'),
+  districtFilter: document.getElementById('districtFilter'),
+  areaFilter: document.getElementById('areaFilter'),
+  locationFilter: document.getElementById('locationFilter'),
+  distanceFilter: document.getElementById('distanceFilter'),
+  categoryChips: document.getElementById('categoryChips'),
+  priceChips: document.getElementById('priceChips'),
+  dietChips: document.getElementById('dietChips'),
+  halalPorkChips: document.getElementById('halalPorkChips'),
+  timingChips: document.getElementById('timingChips'),
+  clearTimingBtn: document.getElementById('clearTimingBtn'),
+  timingsToggleBtn: document.getElementById('timingsToggleBtn'),
+  timingsPanel: document.getElementById('timingsPanel'),
+  addPanel: document.getElementById('addPanel'),
+  addPanelTitle: document.getElementById('addPanelTitle'),
+  toggleAddBtn: document.getElementById('toggleAddBtn'),
+  cancelAddBtn: document.getElementById('cancelAddBtn'),
+  saveAddBtn: document.getElementById('saveAddBtn'),
+  saveStatus: document.getElementById('saveStatus'),
+  toast: document.getElementById('toast'),
+  adminControls: document.getElementById('adminControls'),
+  importSeedBtn: document.getElementById('importSeedBtn'),
+  authStatus: document.getElementById('authStatus'),
+  loginToggleBtn: document.getElementById('loginToggleBtn'),
+  logoutBtn: document.getElementById('logoutBtn'),
+  loginPanel: document.getElementById('loginPanel'),
+  loginEmail: document.getElementById('loginEmail'),
+  loginPassword: document.getElementById('loginPassword'),
+  loginSubmitBtn: document.getElementById('loginSubmitBtn'),
+  loginCancelBtn: document.getElementById('loginCancelBtn'),
+  loginStatus: document.getElementById('loginStatus'),
+  f_state: document.getElementById('f_state'),
+  f_state_new: document.getElementById('f_state_new'),
+  f_district: document.getElementById('f_district'),
+  f_district_new: document.getElementById('f_district_new'),
+  f_area: document.getElementById('f_area'),
+  f_area_new: document.getElementById('f_area_new'),
+  f_location: document.getElementById('f_location'),
+  f_location_new: document.getElementById('f_location_new'),
+  f_category: document.getElementById('f_category'),
+  f_category_new: document.getElementById('f_category_new'),
+  f_price: document.getElementById('f_price'),
+  f_hours: document.getElementById('f_hours'),
+  f_distance: document.getElementById('f_distance'),
+  f_maplink: document.getElementById('f_maplink'),
+  f_diet: document.getElementById('f_diet'),
+  f_halal: document.getElementById('f_halal'),
+  f_halal_wrap: document.getElementById('f_halal_wrap'),
+  f_pork: document.getElementById('f_pork'),
+  f_pork_wrap: document.getElementById('f_pork_wrap'),
+  f_chain: document.getElementById('f_chain'),
+  f_payment: document.getElementById('f_payment'),
+  f_usp: document.getElementById('f_usp'),
+  f_name: document.getElementById('f_name'),
+  f_instagram: document.getElementById('f_instagram'),
+  f_note: document.getElementById('f_note'),
+  h_kitchen: document.getElementById('h_kitchen'),
+  h_tables: document.getElementById('h_tables'),
+  h_glass: document.getElementById('h_glass'),
+  h_floor: document.getElementById('h_floor'),
+  h_toilet: document.getElementById('h_toilet'),
+  h_staff: document.getElementById('h_staff'),
+  h_service: document.getElementById('h_service'),
+  formTimingChips: document.getElementById('formTimingChips'),
+};
+
+function uniqueSorted(arr){ return Array.from(new Set(arr.filter(v=>v!==undefined && v!==null && v!==""))).sort(); }
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escapeAttr(s){ return String(s).replace(/"/g,'&quot;'); }
+
+function distanceBucket(km){
+  if(km === null || km === undefined || km === "") return null;
+  const n = parseFloat(km);
+  if(isNaN(n)) return null;
+  if(n <= 0.5) return "500m";
+  if(n <= 1) return "1km";
+  if(n <= 2) return "1-2km";
+  if(n <= 5) return "2-5km";
+  if(n <= 10) return "5-10km";
+  return "10km+";
+}
+
+function formatHour(h){
+  const hh = ((h % 24) + 24) % 24;
+  const ampm = hh < 12 ? 'AM' : 'PM';
+  let hour12 = hh % 12;
+  if(hour12 === 0) hour12 = 12;
+  return `${hour12} ${ampm}`;
+}
+
+function mergedTimingLabels(timings){
+  if(!timings || timings.length === 0) return [];
+  if(timings.includes("24 Hours")) return ["Open 24 Hours"];
+  const ranges = timings
+    .filter(t => TIMING_RANGES[t])
+    .map(t => ({start: TIMING_RANGES[t][0], end: TIMING_RANGES[t][1]}))
+    .sort((a,b)=>a.start-b.start);
+  const merged = [];
+  ranges.forEach(r=>{
+    const last = merged[merged.length-1];
+    if(last && r.start <= last.end){ last.end = Math.max(last.end, r.end); }
+    else { merged.push({start:r.start, end:r.end}); }
+  });
+  return merged.map(m => `${formatHour(m.start)} – ${formatHour(m.end)}`);
+}
+
+
+const NEW_OPTION = "__new__";
+
+function buildSelectOptions(selectEl, options, keepValue){
+  const prevValue = keepValue !== undefined ? keepValue : selectEl.value;
+  selectEl.innerHTML = "";
+  const blank = document.createElement('option');
+  blank.value = ""; blank.textContent = "— Select —";
+  selectEl.appendChild(blank);
+  options.forEach(o=>{
+    const op = document.createElement('option');
+    op.value = o; op.textContent = o;
+    selectEl.appendChild(op);
+  });
+  const addNew = document.createElement('option');
+  addNew.value = NEW_OPTION; addNew.textContent = "+ Add New…";
+  selectEl.appendChild(addNew);
+  if(prevValue && (options.includes(prevValue) || prevValue === NEW_OPTION)){
+    selectEl.value = prevValue;
+  } else {
+    selectEl.value = "";
+  }
+}
+
+function getSelectValue(selectEl, newInputEl){
+  return selectEl.value === NEW_OPTION ? newInputEl.value.trim() : selectEl.value;
+}
+
+function toggleNewInput(selectEl, newInputEl){
+  const show = selectEl.value === NEW_OPTION;
+  newInputEl.style.display = show ? "block" : "none";
+}
+
+function refreshFormStateOptions(){
+  buildSelectOptions(els.f_state, uniqueSorted(PLACES.map(p=>p.state)));
+  toggleNewInput(els.f_state, els.f_state_new);
+}
+function refreshFormDistrictOptions(){
+  const st = getSelectValue(els.f_state, els.f_state_new).toLowerCase();
+  const pool = st ? PLACES.filter(p=>p.state.toLowerCase()===st) : PLACES;
+  buildSelectOptions(els.f_district, uniqueSorted(pool.map(p=>p.district)));
+  toggleNewInput(els.f_district, els.f_district_new);
+}
+function refreshFormAreaOptions(){
+  const st = getSelectValue(els.f_state, els.f_state_new).toLowerCase();
+  const di = getSelectValue(els.f_district, els.f_district_new).toLowerCase();
+  let pool = PLACES;
+  if(st) pool = pool.filter(p=>p.state.toLowerCase()===st);
+  if(di) pool = pool.filter(p=>p.district.toLowerCase()===di);
+  buildSelectOptions(els.f_area, uniqueSorted(pool.map(p=>p.area)));
+  toggleNewInput(els.f_area, els.f_area_new);
+}
+function refreshFormLocationOptions(){
+  const st = getSelectValue(els.f_state, els.f_state_new).toLowerCase();
+  const di = getSelectValue(els.f_district, els.f_district_new).toLowerCase();
+  const ar = getSelectValue(els.f_area, els.f_area_new).toLowerCase();
+  let pool = PLACES;
+  if(st) pool = pool.filter(p=>p.state.toLowerCase()===st);
+  if(di) pool = pool.filter(p=>p.district.toLowerCase()===di);
+  if(ar) pool = pool.filter(p=>p.area.toLowerCase()===ar);
+  buildSelectOptions(els.f_location, uniqueSorted(pool.map(p=>p.location)));
+  toggleNewInput(els.f_location, els.f_location_new);
+}
+
+function refreshFormCategoryOptions(){
+  buildSelectOptions(els.f_category, uniqueSorted(PLACES.map(p=>p.category)));
+  toggleNewInput(els.f_category, els.f_category_new);
+}
+
+function syncDietFieldsVisibility(){
+  const show = els.f_diet.value === "Non-Veg";
+  els.f_halal_wrap.style.display = show ? "flex" : "none";
+  els.f_pork_wrap.style.display = show ? "flex" : "none";
+  if(!show){ els.f_halal.value = ""; els.f_pork.value = ""; }
+}
+
+function wireLocationSelects(){
+  if(els.f_state._wired) return;
+  els.f_state._wired = true;
+  els.f_state.addEventListener('change', ()=>{
+    toggleNewInput(els.f_state, els.f_state_new);
+    refreshFormDistrictOptions(); refreshFormAreaOptions(); refreshFormLocationOptions();
+  });
+  els.f_district.addEventListener('change', ()=>{
+    toggleNewInput(els.f_district, els.f_district_new);
+    refreshFormAreaOptions(); refreshFormLocationOptions();
+  });
+  els.f_area.addEventListener('change', ()=>{
+    toggleNewInput(els.f_area, els.f_area_new);
+    refreshFormLocationOptions();
+  });
+  els.f_location.addEventListener('change', ()=>{
+    toggleNewInput(els.f_location, els.f_location_new);
+  });
+  els.f_category.addEventListener('change', ()=>{
+    toggleNewInput(els.f_category, els.f_category_new);
+  });
+}
+
+function populateFilterOptions(){
+  const states = ["All States", ...uniqueSorted(PLACES.map(p=>p.state))];
+  const prevState = els.stateFilter.value || "All States";
+  els.stateFilter.innerHTML = "";
+  states.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; els.stateFilter.appendChild(o); });
+  els.stateFilter.value = states.includes(prevState) ? prevState : "All States";
+  populateDistrictOptions();
+  populateCategoryChips();
+  populatePriceChips();
+  populateDietChips();
+  populateTimingFilterChips();
+}
+function populateDistrictOptions(){
+  const selState = els.stateFilter.value;
+  const pool = selState === "All States" ? PLACES : PLACES.filter(p=>p.state===selState);
+  const districts = ["All Districts", ...uniqueSorted(pool.map(p=>p.district))];
+  const prev = els.districtFilter.value || "All Districts";
+  els.districtFilter.innerHTML = "";
+  districts.forEach(d=>{ const o=document.createElement('option'); o.value=d; o.textContent=d; els.districtFilter.appendChild(o); });
+  els.districtFilter.value = districts.includes(prev) ? prev : "All Districts";
+  populateAreaOptions();
+}
+function populateAreaOptions(){
+  const selState = els.stateFilter.value;
+  const selDistrict = els.districtFilter.value;
+  let pool = PLACES;
+  if(selState !== "All States") pool = pool.filter(p=>p.state===selState);
+  if(selDistrict !== "All Districts") pool = pool.filter(p=>p.district===selDistrict);
+  const areas = ["All Areas", ...uniqueSorted(pool.map(p=>p.area))];
+  const prev = els.areaFilter.value || "All Areas";
+  els.areaFilter.innerHTML = "";
+  areas.forEach(a=>{ const o=document.createElement('option'); o.value=a; o.textContent=a; els.areaFilter.appendChild(o); });
+  els.areaFilter.value = areas.includes(prev) ? prev : "All Areas";
+  populateLocationOptions();
+}
+function populateLocationOptions(){
+  const selState = els.stateFilter.value;
+  const selDistrict = els.districtFilter.value;
+  const selArea = els.areaFilter.value;
+  let pool = PLACES;
+  if(selState !== "All States") pool = pool.filter(p=>p.state===selState);
+  if(selDistrict !== "All Districts") pool = pool.filter(p=>p.district===selDistrict);
+  if(selArea !== "All Areas") pool = pool.filter(p=>p.area===selArea);
+  const locs = ["All Locations", ...uniqueSorted(pool.map(p=>p.location))];
+  const prev = els.locationFilter.value || "All Locations";
+  els.locationFilter.innerHTML = "";
+  locs.forEach(l=>{ const o=document.createElement('option'); o.value=l; o.textContent=l; els.locationFilter.appendChild(o); });
+  els.locationFilter.value = locs.includes(prev) ? prev : "All Locations";
+}
+function populateCategoryChips(){
+  const categories = ["All", ...uniqueSorted(PLACES.map(p=>p.category))];
+  els.categoryChips.innerHTML = "";
+  if(!categories.includes(activeCategory)) activeCategory = "All";
+  categories.forEach(cat=>{
+    const c = document.createElement('div');
+    c.className = 'chip' + (cat === activeCategory ? " active" : "");
+    c.textContent = cat;
+    c.addEventListener('click', ()=>{ activeCategory = cat; populateCategoryChips(); render(); });
+    els.categoryChips.appendChild(c);
+  });
+}
+function populatePriceChips(){
+  const prices = ["All", "Budget", "Premium"];
+  els.priceChips.innerHTML = "";
+  prices.forEach(p=>{
+    const c = document.createElement('div');
+    c.className = 'chip' + (p === activePrice ? " active" : "");
+    c.textContent = p;
+    c.addEventListener('click', ()=>{ activePrice = p; populatePriceChips(); render(); });
+    els.priceChips.appendChild(c);
+  });
+}
+function populateDietChips(){
+  const diets = ["All", "Veg", "Non-Veg"];
+  els.dietChips.innerHTML = "";
+  diets.forEach(d=>{
+    const c = document.createElement('div');
+    c.className = 'chip' + (d === activeDiet ? " active" : "");
+    c.textContent = d;
+    c.addEventListener('click', ()=>{ activeDiet = d; populateDietChips(); render(); });
+    els.dietChips.appendChild(c);
+  });
+
+  els.halalPorkChips.innerHTML = "";
+  const halalOptions = ["All", "Halal Only"];
+  halalOptions.forEach(h=>{
+    const c = document.createElement('div');
+    c.className = 'chip' + (h === activeHalal ? " active" : "");
+    c.textContent = h;
+    c.addEventListener('click', ()=>{ activeHalal = h; populateDietChips(); render(); });
+    els.halalPorkChips.appendChild(c);
+  });
+  const porkChip = document.createElement('div');
+  porkChip.className = 'chip' + (excludePork ? " active" : "");
+  porkChip.textContent = "Hide Pork-Serving";
+  porkChip.addEventListener('click', ()=>{ excludePork = !excludePork; populateDietChips(); render(); });
+  els.halalPorkChips.appendChild(porkChip);
+}
+function populateTimingFilterChips(){
+  els.timingChips.innerHTML = "";
+  TIMING_BUCKETS.forEach(b=>{
+    const c = document.createElement('div');
+    c.className = 'chip' + (activeTimings.has(b.key) ? " active" : "");
+    c.textContent = b.label;
+    c.addEventListener('click', ()=>{
+      if(activeTimings.has(b.key)) activeTimings.delete(b.key); else activeTimings.add(b.key);
+      populateTimingFilterChips(); render();
+    });
+    els.timingChips.appendChild(c);
+  });
+  const isOpen = els.timingsPanel.style.display !== 'none';
+  els.timingsToggleBtn.textContent = (isOpen ? 'Timings ▴' : 'Timings ▾') + (activeTimings.size ? ` (${activeTimings.size})` : '');
+}
+function buildFormTimingChips(){
+  els.formTimingChips.innerHTML = "";
+  TIMING_BUCKETS.forEach(b=>{
+    const c = document.createElement('div');
+    c.className = 'form-chip';
+    c.textContent = b.label;
+    c.dataset.key = b.key;
+    c.addEventListener('click', ()=>{
+      if(formTimings.has(b.key)) formTimings.delete(b.key); else formTimings.add(b.key);
+      c.classList.toggle('active');
+    });
+    els.formTimingChips.appendChild(c);
+  });
+}
+function syncFormTimingChipsUI(){
+  Array.from(els.formTimingChips.children).forEach(c=>{
+    c.classList.toggle('active', formTimings.has(c.dataset.key));
+  });
+}
+
+function render(){
+  const q = els.search.value.trim().toLowerCase();
+  els.searchClearBtn.classList.toggle('show', q.length > 0);
+
+  const st = els.stateFilter.value;
+  const di = els.districtFilter.value;
+  const ar = els.areaFilter.value;
+  const loc = els.locationFilter.value;
+  const distSel = els.distanceFilter.value;
+
+  let filtered = PLACES.filter(p=>{
+    const matchesState = st === "All States" ? true : p.state === st;
+    const matchesDistrict = di === "All Districts" ? true : p.district === di;
+    const matchesArea = ar === "All Areas" ? true : p.area === ar;
+    const matchesLocation = loc === "All Locations" ? true : p.location === loc;
+    const matchesCat = activeCategory === "All" ? true : p.category === activeCategory;
+    const matchesPrice = activePrice === "All" ? true : p.price === activePrice;
+    const matchesDiet = activeDiet === "All" ? true : p.diet === activeDiet;
+    const matchesHalal = activeHalal === "All" ? true : p.halal === "Yes";
+    const matchesPork = excludePork ? p.pork !== "Yes" : true;
+    const matchesTiming = activeTimings.size === 0 ? true : (p.timings || []).some(t => activeTimings.has(t));
+    const matchesDistance = distSel === "All" ? true : distanceBucket(p.distance_km) === distSel;
+    const hay = (p.name+" "+p.state+" "+p.district+" "+p.area+" "+(p.location||"")+" "+p.category+" "+(p.chain||"")+" "+(p.usp||"")+" "+p.note).toLowerCase();
+    const matchesQ = q === "" ? true : hay.includes(q);
+    return matchesState && matchesDistrict && matchesArea && matchesLocation && matchesCat && matchesPrice && matchesDiet && matchesHalal && matchesPork && matchesTiming && matchesDistance && matchesQ;
+  });
+
+  // Group entries that share a Chain name so branches list under one card.
+  const chainGroups = {};
+  const cards = [];
+  filtered.forEach(p=>{
+    if(p.chain && p.chain.trim()){
+      const key = p.chain.trim().toLowerCase();
+      if(!chainGroups[key]) chainGroups[key] = [];
+      chainGroups[key].push(p);
+    } else {
+      cards.push({ main: p, branches: [] });
+    }
+  });
+  Object.values(chainGroups).forEach(group=>{
+    group.sort((a,b)=>(a.area||'').localeCompare(b.area||''));
+    cards.push({ main: group[0], branches: group.slice(1) });
+  });
+
+  cards.sort((a,b)=> (a.main.name||'').localeCompare(b.main.name||''));
+
+  els.count.textContent = filtered.length + (filtered.length===1?' spot found':' spots found');
+  els.results.innerHTML = "";
+
+  if(cards.length === 0){
+    els.results.innerHTML = '<div class="empty"><span class="big">☕</span>Nothing here. Try a different filter or search term.</div>';
+    return;
+  }
+
+  let currentLetter = null;
+  cards.forEach(item=>{
+    const p = item.main;
+    const letter = (p.name && p.name[0]) ? p.name[0].toUpperCase() : '#';
+    if(letter !== currentLetter){
+      currentLetter = letter;
+      const h = document.createElement('div'); h.className='letter-heading'; h.textContent=currentLetter;
+      els.results.appendChild(h);
+    }
+    els.results.appendChild(buildCard(p, item.branches));
+  });
+}
+
+function findClosestAlternative(p){
+  // No GPS coordinates are stored (removed for simplicity), so this is an approximation:
+  // same Category AND same Diet Type (if set) — prefer same Area, fall back to same District.
+  let pool = PLACES.filter(x=>x.id!==p.id && x.category===p.category);
+  if(p.diet){
+    pool = pool.filter(x=>x.diet === p.diet);
+  }
+  let alt = pool.find(x=>x.area===p.area);
+  if(!alt) alt = pool.find(x=>x.district===p.district);
+  return alt ? { place: alt, km: null } : null;
+}
+
+function buildCard(p, branches){
+  branches = branches || [];
+  const card = document.createElement('div');
+  card.className = 'card';
+  const exactLoc = p.location ? escapeHtml(p.location) : '';
+
+  let distanceLine = '';
+  if(p.distance_km !== null && p.distance_km !== undefined && p.distance_km !== ""){
+    distanceLine = `<span class="loc-tag">${p.distance_km} km from ${escapeHtml(p.area)}</span>`;
+  }
+  const timingTags = mergedTimingLabels(p.timings).map(label=>`<span class="time-tag">${escapeHtml(label)}</span>`).join('');
+  const priceTag = p.price ? `<span class="price-tag">${escapeHtml(p.price)}</span>` : '';
+  const paymentTag = p.payment ? `<span class="payment-tag">${escapeHtml(p.payment)}</span>` : '';
+  const hoursLine = p.hours ? `<div class="hours-line">⏱ ${escapeHtml(p.hours)}</div>` : '';
+  const locationLine = exactLoc ? `<div class="hours-line">📍 ${exactLoc}</div>` : '';
+  const instagramLine = p.instagram ? `<div class="hours-line">📷 <a href="${escapeAttr(p.instagram)}" target="_blank" rel="noopener noreferrer" style="color:var(--search-accent);">View on Instagram</a></div>` : '';
+  const uspLine = p.usp ? `<div class="usp-line">${escapeHtml(p.usp)}</div>` : '';
+  const mapLine = p.maplink ? `<div class="hours-line">📍 <a href="${escapeAttr(p.maplink)}" target="_blank" rel="noopener noreferrer" style="color:var(--search-accent);">Open in Google Maps</a></div>` : '';
+
+  let dietTag = '';
+  if(p.diet === 'Veg') dietTag = `<span class="diet-tag veg">VEG</span>`;
+  else if(p.diet === 'Non-Veg') dietTag = `<span class="diet-tag nonveg">NON-VEG</span>`;
+  const halalTag = p.halal === 'Yes' ? `<span class="halal-tag">Halal</span>` : '';
+  const porkTag = p.pork === 'Yes' ? `<span class="pork-tag">Contains Pork</span>` : '';
+
+  let chainTag = '';
+  const totalBranches = branches.length + 1;
+  if(p.chain && totalBranches > 1){
+    chainTag = `<span class="chain-tag" data-chain="${escapeAttr(p.chain)}">${escapeHtml(p.chain)} · ${totalBranches} branches</span>`;
+  }
+
+  let hygieneBox = '';
+  const hy = p.hygiene || {};
+  const hyEntries = [
+    ['Kitchen', hy.kitchen], ['Tables', hy.tables], ['Glasses', hy.glass],
+    ['Floor', hy.floor], ['Toilet', hy.toilet], ['Staff', hy.staff], ['Service', hy.service],
+  ].filter(([,v])=> v !== null && v !== undefined && v !== "");
+  if(hyEntries.length){
+    hygieneBox = `<div class="hygiene-box"><p class="hygiene-label">Hygiene</p><div class="hygiene-grid">${
+      hyEntries.map(([label,val])=>`<div class="hygiene-row"><span>${label}</span><span>${val}</span></div>`).join('')
+    }</div></div>`;
+  }
+
+  let altLine = '';
+  const altResult = findClosestAlternative(p);
+  if(altResult){
+    const alt = altResult.place;
+    altLine = `<div class="alt-line">Alternative nearby: <a href="#" data-alt="${escapeAttr(alt.name || '')}">${escapeHtml(alt.name || '(unnamed)')} (${escapeHtml(alt.area)})</a></div>`;
+  }
+
+  let branchesBox = '';
+  if(branches.length){
+    const rows = branches.map(b=>{
+      const bLoc = b.location ? `, ${escapeHtml(b.location)}` : '';
+      const bHours = b.hours ? ` — ${escapeHtml(b.hours)}` : '';
+      const bMap = b.maplink ? ` · <a href="${escapeAttr(b.maplink)}" target="_blank" rel="noopener noreferrer">Map</a>` : '';
+      return `<div class="branch-row">${escapeHtml(b.area)}${bLoc}${bHours}${bMap}</div>`;
+    }).join('');
+    branchesBox = `<div class="branches-box"><p class="branches-label">Other Branches (${branches.length})</p>${rows}</div>`;
+  }
+
+  const adminButtons = isAdmin ? `
+    <div class="card-actions">
+      <button class="btn-ghost btn-small" data-action="edit" data-id="${p.id}">Edit</button>
+      <button class="btn-danger btn-small" data-action="delete" data-id="${p.id}">Delete</button>
+    </div>` : '';
+
+  card.innerHTML = `
+    <div class="card-top">
+      <span class="name">${p.name ? escapeHtml(p.name) : '(Unnamed spot)'}</span>
+      <div class="tag-row">
+        <span class="loc-tag">${escapeHtml(p.area)}</span>
+        <span class="loc-tag">${escapeHtml(p.district)}, ${escapeHtml(p.state)}</span>
+        ${priceTag}
+        ${dietTag}
+      </div>
+    </div>
+    <div class="tag-row">${distanceLine}${timingTags}${paymentTag}${halalTag}${porkTag}${chainTag}</div>
+    <span class="cat-tag">${escapeHtml(p.category)}</span>
+    ${uspLine}
+    ${locationLine}
+    ${hoursLine}
+    ${instagramLine}
+    ${mapLine}
+    <div class="note">${escapeHtml(p.note)}</div>
+    ${hygieneBox}
+    ${altLine}
+    ${branchesBox}
+    ${adminButtons}
+  `;
+  const chainEl = card.querySelector('[data-chain]');
+  if(chainEl){
+    chainEl.addEventListener('click', ()=>{ els.search.value = chainEl.dataset.chain; render(); window.scrollTo({top:0, behavior:'smooth'}); });
+  }
+  const altEl = card.querySelector('[data-alt]');
+  if(altEl){
+    altEl.addEventListener('click', (e)=>{ e.preventDefault(); els.search.value = altEl.dataset.alt; render(); window.scrollTo({top:0, behavior:'smooth'}); });
+  }
+  if(isAdmin){
+    card.querySelector('[data-action="edit"]').addEventListener('click', ()=>openEdit(p.id));
+    card.querySelector('[data-action="delete"]').addEventListener('click', ()=>deletePlace(p.id));
+  }
+  return card;
+}
+
+// ---------- Admin form ----------
+function openAddForm(){
+  editingId = null;
+  els.addPanelTitle.textContent = "Add a New Place";
+  els.saveAddBtn.textContent = "Save Place";
+  clearForm();
+  els.addPanel.classList.add('open');
+  els.saveStatus.textContent = "";
+}
+function openEdit(id){
+  const p = PLACES.find(x=>x.id===id);
+  if(!p) return;
+  editingId = id;
+  els.addPanelTitle.textContent = "Edit Place";
+  els.saveAddBtn.textContent = "Update Place";
+
+  refreshFormStateOptions(); els.f_state.value = p.state || ""; toggleNewInput(els.f_state, els.f_state_new);
+  refreshFormDistrictOptions(); els.f_district.value = p.district || ""; toggleNewInput(els.f_district, els.f_district_new);
+  refreshFormAreaOptions(); els.f_area.value = p.area || ""; toggleNewInput(els.f_area, els.f_area_new);
+  refreshFormLocationOptions(); els.f_location.value = p.location || ""; toggleNewInput(els.f_location, els.f_location_new);
+  refreshFormCategoryOptions(); els.f_category.value = p.category || ""; toggleNewInput(els.f_category, els.f_category_new);
+
+  els.f_price.value = p.price || "";
+  els.f_hours.value = p.hours || "";
+  els.f_distance.value = (p.distance_km === null || p.distance_km === undefined) ? "" : p.distance_km;
+  els.f_maplink.value = p.maplink || "";
+  els.f_chain.value = p.chain || "";
+  els.f_payment.value = p.payment || "";
+  els.f_diet.value = p.diet || "";
+  els.f_halal.value = p.halal || "";
+  els.f_pork.value = p.pork || "";
+  syncDietFieldsVisibility();
+  els.f_usp.value = p.usp || "";
+  els.f_name.value = p.name || "";
+  els.f_instagram.value = p.instagram || "";
+  els.f_note.value = p.note || "";
+  const hy = p.hygiene || {};
+  els.h_kitchen.value = hy.kitchen ?? "";
+  els.h_tables.value = hy.tables ?? "";
+  els.h_glass.value = hy.glass ?? "";
+  els.h_floor.value = hy.floor ?? "";
+  els.h_toilet.value = hy.toilet ?? "";
+  els.h_staff.value = hy.staff ?? "";
+  els.h_service.value = hy.service ?? "";
+  formTimings = new Set(p.timings || []);
+  syncFormTimingChipsUI();
+  els.addPanel.classList.add('open');
+  els.saveStatus.textContent = "";
+  els.addPanel.scrollIntoView({behavior:'smooth', block:'start'});
+}
+function clearForm(){
+  refreshFormStateOptions(); els.f_state.value=""; els.f_state_new.value=""; toggleNewInput(els.f_state, els.f_state_new);
+  refreshFormDistrictOptions(); els.f_district.value=""; els.f_district_new.value=""; toggleNewInput(els.f_district, els.f_district_new);
+  refreshFormAreaOptions(); els.f_area.value=""; els.f_area_new.value=""; toggleNewInput(els.f_area, els.f_area_new);
+  refreshFormLocationOptions(); els.f_location.value=""; els.f_location_new.value=""; toggleNewInput(els.f_location, els.f_location_new);
+  refreshFormCategoryOptions(); els.f_category.value=""; els.f_category_new.value=""; toggleNewInput(els.f_category, els.f_category_new);
+  els.f_price.value=""; els.f_hours.value=""; els.f_distance.value="";
+  els.f_maplink.value="";
+  els.f_chain.value=""; els.f_payment.value=""; els.f_usp.value="";
+  els.f_diet.value=""; els.f_halal.value=""; els.f_pork.value="";
+  syncDietFieldsVisibility();
+  els.f_name.value=""; els.f_instagram.value=""; els.f_note.value="";
+  els.h_kitchen.value=""; els.h_tables.value=""; els.h_glass.value=""; els.h_floor.value="";
+  els.h_toilet.value=""; els.h_staff.value=""; els.h_service.value="";
+  formTimings = new Set();
+  syncFormTimingChipsUI();
+}
+function closeAddForm(){
+  els.addPanel.classList.remove('open');
+  editingId = null;
+  clearForm();
+}
+function showToast(msg){
+  els.toast.textContent = msg;
+  els.toast.classList.add('show');
+  setTimeout(()=>{ els.toast.classList.remove('show'); }, 1800);
+}
+
+async function saveForm(){
+  const hygiene = {
+    kitchen: els.h_kitchen.value === "" ? null : parseFloat(els.h_kitchen.value),
+    tables: els.h_tables.value === "" ? null : parseFloat(els.h_tables.value),
+    glass: els.h_glass.value === "" ? null : parseFloat(els.h_glass.value),
+    floor: els.h_floor.value === "" ? null : parseFloat(els.h_floor.value),
+    toilet: els.h_toilet.value === "" ? null : parseFloat(els.h_toilet.value),
+    staff: els.h_staff.value === "" ? null : parseFloat(els.h_staff.value),
+    service: els.h_service.value === "" ? null : parseFloat(els.h_service.value),
+  };
+  const entry = {
+    state: getSelectValue(els.f_state, els.f_state_new),
+    district: getSelectValue(els.f_district, els.f_district_new),
+    area: getSelectValue(els.f_area, els.f_area_new),
+    location: getSelectValue(els.f_location, els.f_location_new),
+    category: getSelectValue(els.f_category, els.f_category_new) || "Uncategorized",
+    price: els.f_price.value,
+    hours: els.f_hours.value.trim(),
+    distance_km: els.f_distance.value === "" ? null : parseFloat(els.f_distance.value),
+    maplink: els.f_maplink.value.trim(),
+    chain: els.f_chain.value.trim(),
+    payment: els.f_payment.value,
+    diet: els.f_diet.value,
+    halal: els.f_diet.value === "Non-Veg" ? els.f_halal.value : "",
+    pork: els.f_diet.value === "Non-Veg" ? els.f_pork.value : "",
+    usp: els.f_usp.value.trim(),
+    name: els.f_name.value.trim(),
+    instagram: els.f_instagram.value.trim(),
+    timings: Array.from(formTimings),
+    hygiene: hygiene,
+    note: els.f_note.value.trim(),
+  };
+  if(!entry.state || !entry.district || !entry.area){
+    els.saveStatus.textContent = "Please fill in State, District, and Area.";
+    return;
+  }
+  els.saveStatus.textContent = "Saving…";
+  try{
+    if(editingId){
+      await placesCol.doc(editingId).update(entry);
+      showToast("Entry Updated");
+    } else {
+      await placesCol.add(entry);
+      showToast("Entry Added");
+    }
+    closeAddForm();
+  } catch(err){
+    els.saveStatus.textContent = "Save failed: " + err.message;
+  }
+}
+
+async function deletePlace(id){
+  const p = PLACES.find(x=>x.id===id);
+  if(!p) return;
+  if(!confirm(`Delete "${p.name || 'this place'}"? This can't be undone.`)) return;
+  try{
+    await placesCol.doc(id).delete();
+    showToast("Entry Deleted");
+  } catch(err){
+    alert("Delete failed: " + err.message);
+  }
+}
+
+async function importSeedData(){
+  if(!confirm(`This will add ${SEED_DATA.length} starter places to your live database. Only run this once. Continue?`)) return;
+  els.importSeedBtn.disabled = true;
+  els.importSeedBtn.textContent = "Importing…";
+  try{
+    const batchSize = 20;
+    for(let i=0; i<SEED_DATA.length; i+=batchSize){
+      const batch = db.batch();
+      SEED_DATA.slice(i, i+batchSize).forEach(entry=>{
+        const ref = placesCol.doc();
+        batch.set(ref, entry);
+      });
+      await batch.commit();
+    }
+    showToast("Starter data imported");
+  } catch(err){
+    alert("Import failed: " + err.message);
+  } finally {
+    els.importSeedBtn.disabled = false;
+    els.importSeedBtn.textContent = "Import Starter Data (run once)";
+  }
+}
+
+// ---------- Auth ----------
+auth.onAuthStateChanged(user=>{
+  isAdmin = !!user;
+  els.authStatus.textContent = isAdmin ? `Logged in as ${user.email}` : "Viewing only";
+  els.loginToggleBtn.style.display = isAdmin ? 'none' : 'inline-block';
+  els.logoutBtn.style.display = isAdmin ? 'inline-block' : 'none';
+  els.adminControls.style.display = isAdmin ? 'flex' : 'none';
+  els.loginPanel.classList.remove('open');
+  render();
+});
+
+els.loginToggleBtn.addEventListener('click', ()=>{ els.loginPanel.classList.add('open'); });
+els.loginCancelBtn.addEventListener('click', ()=>{ els.loginPanel.classList.remove('open'); });
+els.loginSubmitBtn.addEventListener('click', async ()=>{
+  els.loginStatus.textContent = "Logging in…";
+  try{
+    await auth.signInWithEmailAndPassword(els.loginEmail.value.trim(), els.loginPassword.value);
+    els.loginStatus.textContent = "";
+    els.loginEmail.value = ""; els.loginPassword.value = "";
+  } catch(err){
+    els.loginStatus.textContent = "Login failed: " + err.message;
+  }
+});
+els.logoutBtn.addEventListener('click', ()=>{ auth.signOut(); });
+
+// ---------- Live data ----------
+placesCol.onSnapshot(snapshot=>{
+  PLACES = snapshot.docs.map(doc=>({ id: doc.id, ...doc.data() }));
+  populateFilterOptions();
+  buildFormTimingChips();
+  wireLocationSelects();
+  render();
+}, err=>{
+  els.results.innerHTML = `<div class="empty">Could not load data: ${escapeHtml(err.message)}</div>`;
+});
+
+// ---------- Wiring ----------
+els.toggleAddBtn.addEventListener('click', openAddForm);
+els.f_diet.addEventListener('change', syncDietFieldsVisibility);
+els.cancelAddBtn.addEventListener('click', closeAddForm);
+els.saveAddBtn.addEventListener('click', saveForm);
+els.importSeedBtn.addEventListener('click', importSeedData);
+
+els.search.addEventListener('input', render);
+els.searchClearBtn.addEventListener('click', ()=>{ els.search.value=""; els.search.focus(); render(); });
+els.stateFilter.addEventListener('change', ()=>{ populateDistrictOptions(); render(); });
+els.districtFilter.addEventListener('change', ()=>{ populateAreaOptions(); render(); });
+els.areaFilter.addEventListener('change', ()=>{ populateLocationOptions(); render(); });
+els.locationFilter.addEventListener('change', render);
+els.distanceFilter.addEventListener('change', render);
+els.clearTimingBtn.addEventListener('click', ()=>{ activeTimings.clear(); populateTimingFilterChips(); render(); });
+els.timingsToggleBtn.addEventListener('click', ()=>{
+  const isOpen = els.timingsPanel.style.display !== 'none';
+  els.timingsPanel.style.display = isOpen ? 'none' : 'block';
+  populateTimingFilterChips();
+});
+
+buildFormTimingChips();
+wireLocationSelects();
+</script>
+</body>
+</html>
