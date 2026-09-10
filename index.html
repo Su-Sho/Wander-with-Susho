@@ -264,16 +264,24 @@
     padding:6px 2px;
     border-bottom:1px dashed var(--card-border);
     cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
   }
   .branch-row:last-child{border-bottom:none;}
   .branch-row a{color:var(--search-accent);}
+  .branch-name{flex:1;}
   .branch-expand{
-    float:right;
-    font-family:'Courier New',monospace;
+    flex-shrink:0;
     font-size:10.5px;
+    font-weight:600;
     color:var(--search-accent);
+    background:color-mix(in srgb, var(--search-accent) 12%, transparent);
+    border:1px solid var(--search-accent);
+    border-radius:12px;
+    padding:3px 9px;
   }
-  .branch-row.expanded .branch-expand{text-decoration:underline;}
   .branch-detail{
     padding:4px 4px 8px 10px;
     margin-bottom:4px;
@@ -2638,7 +2646,7 @@ function jumpToPlace(id){
   els.locationFilter.value = "All Locations";
   els.distanceFilter.value = "All";
   activeCategory = "All"; activePrice = "All"; activeDiet = "All"; activeHalal = "All";
-  porkOnly = false; seafoodOnly = false; activeTimings = new Set();
+  porkOnly = false; seafoodOnly = false; favoritesOnly = false; activeTimings = new Set();
   populateCategoryChips(); populatePriceChips(); populateDietChips(); populateTimingFilterChips();
   render();
   requestAnimationFrame(()=>{
@@ -2653,6 +2661,57 @@ function jumpToPlace(id){
       card.classList.add('flash-highlight');
       setTimeout(()=>card.classList.remove('flash-highlight'), 1600);
     }
+  });
+}
+
+// Finds the full chain group (all branch siblings, including itself) for a given place id —
+// same grouping logic used in render(), needed so a shared/deep-linked branch can rebuild
+// its own card with the correct "other branches" list.
+function getGroupFor(id){
+  const p = PLACES.find(x=>x.id === id);
+  if(!p) return [];
+  if(p.chain && p.chain.trim()){
+    const key = p.chain.trim().toLowerCase();
+    const group = PLACES.filter(x => (x.chain || '').trim().toLowerCase() === key);
+    group.sort((a,b)=>(a.area||'').localeCompare(b.area||''));
+    return group;
+  }
+  return [p];
+}
+
+// Opens a specific card directly from a shared link (?id=...). Unlike jumpToPlace, if the
+// shared id belongs to a BRANCH (not the group's default main), this swaps that branch in
+// as its own full card — so the person lands on exactly the entry that was shared with them.
+function openSharedPlace(id){
+  const target = PLACES.find(x => x.id === id);
+  if(!target) return;
+  els.search.value = "";
+  els.stateFilter.value = "All States"; populateDistrictOptions();
+  els.districtFilter.value = "All Districts"; populateAreaOptions();
+  els.areaFilter.value = "All Areas"; populateLocationOptions();
+  els.locationFilter.value = "All Locations";
+  els.distanceFilter.value = "All";
+  activeCategory = "All"; activePrice = "All"; activeDiet = "All"; activeHalal = "All";
+  porkOnly = false; seafoodOnly = false; favoritesOnly = false; activeTimings = new Set();
+  populateCategoryChips(); populatePriceChips(); populateDietChips(); populateTimingFilterChips();
+  render();
+  requestAnimationFrame(()=>{
+    const card = Array.from(els.results.children).find(el=>{
+      if(!el.dataset) return false;
+      if(el.dataset.mainId === id) return true;
+      if(el.dataset.branchIds && el.dataset.branchIds.split(',').includes(id)) return true;
+      return false;
+    });
+    if(!card) return;
+    let finalCard = card;
+    if(card.dataset.mainId !== id){
+      const group = getGroupFor(id);
+      finalCard = buildCard(target, group);
+      card.replaceWith(finalCard);
+    }
+    finalCard.scrollIntoView({behavior:'smooth', block:'center'});
+    finalCard.classList.add('flash-highlight');
+    setTimeout(()=>finalCard.classList.remove('flash-highlight'), 1600);
   });
 }
 
@@ -2725,8 +2784,7 @@ function buildCard(p, group){
   if(branches.length){
     const rows = branches.map((b)=>{
       const bLoc = b.location ? `, ${escapeHtml(b.location)}` : '';
-      const bHoursShort = (b.hours && b.hours.trim()) ? b.hours : (mergedTimingLabels(b.timings)[0] || '');
-      return `<div class="branch-row" data-branch-id="${escapeAttr(b.id)}">${escapeHtml(b.area)}${bLoc}${bHoursShort ? ` — ${escapeHtml(bHoursShort)}` : ''} <span class="branch-expand">View branch ▸</span></div>`;
+      return `<div class="branch-row" data-branch-id="${escapeAttr(b.id)}"><span class="branch-name">${escapeHtml(b.area)}${bLoc}</span><span class="branch-expand">View details</span></div>`;
     }).join('');
     branchesBox = `<div class="branches-box"><p class="branches-label">${branches.length} more branch${branches.length===1?'':'es'}</p>${rows}</div>`;
   }
@@ -2739,9 +2797,15 @@ function buildCard(p, group){
     </div>` : '';
 
   const heartActive = favorites.has(p.id);
-  const heartBtn = `<button type="button" class="icon-btn heart-btn${heartActive ? ' active' : ''}" data-fav-id="${escapeAttr(p.id)}" title="${heartActive ? 'Remove from favorites' : 'Add to favorites'}" aria-label="Favorite">${heartActive ? '♥' : '♡'}</button>`;
-  const shareText = `Check out ${p.name || 'this place'} in ${p.area || ''}${p.district ? ', ' + p.district : ''} — found on Wander with SuSho: ${window.location.href.split('#')[0]}`;
-  const whatsappBtn = `<a class="icon-btn whatsapp-btn" href="https://wa.me/?text=${encodeURIComponent(shareText)}" target="_blank" rel="noopener noreferrer" title="Share on WhatsApp" aria-label="Share on WhatsApp">📲</a>`;
+  const heartIconSvg = heartActive
+    ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="#e0245e"><path d="M12 21s-6.7-4.35-9.3-8.1C.9 10.2 1.4 6.6 4.3 4.9c2.4-1.4 5.1-.7 6.9 1.3.5.6 1.6.6 2.1 0 1.8-2 4.5-2.7 6.9-1.3 2.9 1.7 3.4 5.3 1.6 8-2.6 3.75-9.3 8.1-9.3 8.1z"/></svg>`
+    : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c9c9c9" stroke-width="1.8"><path d="M12 21s-6.7-4.35-9.3-8.1C.9 10.2 1.4 6.6 4.3 4.9c2.4-1.4 5.1-.7 6.9 1.3.5.6 1.6.6 2.1 0 1.8-2 4.5-2.7 6.9-1.3 2.9 1.7 3.4 5.3 1.6 8-2.6 3.75-9.3 8.1-9.3 8.1z"/></svg>`;
+  const heartBtn = `<button type="button" class="icon-btn heart-btn${heartActive ? ' active' : ''}" data-fav-id="${escapeAttr(p.id)}" title="${heartActive ? 'Remove from favorites' : 'Add to favorites'}" aria-label="Favorite">${heartIconSvg}</button>`;
+  const whatsappIconSvg = `<svg width="15" height="15" viewBox="0 0 32 32" style="vertical-align:-3px;"><path fill="#25D366" d="M16 0C7.163 0 0 7.163 0 16c0 2.825.737 5.48 2.024 7.78L0 32l8.4-2.04A15.9 15.9 0 0 0 16 32c8.837 0 16-7.163 16-16S24.837 0 16 0z"/><path fill="#fff" d="M23.5 19.1c-.35-.17-2.06-1.02-2.38-1.13-.32-.12-.55-.17-.79.17-.23.35-.9 1.13-1.1 1.36-.2.23-.4.26-.75.09-.35-.17-1.47-.54-2.8-1.72-1.03-.92-1.73-2.06-1.93-2.4-.2-.35-.02-.54.15-.71.16-.16.35-.4.52-.61.17-.2.23-.35.35-.58.12-.23.06-.44-.03-.61-.09-.17-.79-1.9-1.08-2.6-.28-.68-.57-.59-.79-.6h-.67c-.23 0-.61.09-.93.44-.32.35-1.22 1.19-1.22 2.9s1.25 3.36 1.42 3.59c.17.23 2.46 3.76 5.96 5.27.83.36 1.48.57 1.99.73.84.27 1.6.23 2.2.14.67-.1 2.06-.84 2.35-1.66.29-.81.29-1.5.2-1.66-.09-.15-.32-.23-.67-.4z"/></svg>`;
+  // Deep link: ?id=<this exact entry's id> so the shared card (main OR a specific branch) opens directly, not the homepage.
+  const shareUrl = `${window.location.href.split('?')[0].split('#')[0]}?id=${encodeURIComponent(p.id)}`;
+  const shareText = `Check out ${p.name || 'this place'} in ${p.area || ''}${p.district ? ', ' + p.district : ''} — found on Wander with SuSho: ${shareUrl}`;
+  const whatsappBtn = `<a class="icon-btn whatsapp-btn" href="https://wa.me/?text=${encodeURIComponent(shareText)}" target="_blank" rel="noopener noreferrer" title="Share on WhatsApp" aria-label="Share on WhatsApp">${whatsappIconSvg}</a>`;
 
   card.innerHTML = `
     <div class="card-top">
@@ -2792,7 +2856,9 @@ function buildCard(p, group){
       saveFavorites();
       const nowActive = favorites.has(id);
       heartEl.classList.toggle('active', nowActive);
-      heartEl.textContent = nowActive ? '♥' : '♡';
+      heartEl.innerHTML = nowActive
+        ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="#e0245e"><path d="M12 21s-6.7-4.35-9.3-8.1C.9 10.2 1.4 6.6 4.3 4.9c2.4-1.4 5.1-.7 6.9 1.3.5.6 1.6.6 2.1 0 1.8-2 4.5-2.7 6.9-1.3 2.9 1.7 3.4 5.3 1.6 8-2.6 3.75-9.3 8.1-9.3 8.1z"/></svg>`
+        : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c9c9c9" stroke-width="1.8"><path d="M12 21s-6.7-4.35-9.3-8.1C.9 10.2 1.4 6.6 4.3 4.9c2.4-1.4 5.1-.7 6.9 1.3.5.6 1.6.6 2.1 0 1.8-2 4.5-2.7 6.9-1.3 2.9 1.7 3.4 5.3 1.6 8-2.6 3.75-9.3 8.1-9.3 8.1z"/></svg>`;
       heartEl.title = nowActive ? 'Remove from favorites' : 'Add to favorites';
       if(favoritesOnly) render();
     });
@@ -3041,12 +3107,18 @@ els.loginSubmitBtn.addEventListener('click', async ()=>{
 els.logoutBtn.addEventListener('click', ()=>{ auth.signOut(); });
 
 // ---------- Live data ----------
+let didHandleDeepLink = false;
 placesCol.onSnapshot(snapshot=>{
   PLACES = snapshot.docs.map(doc=>({ id: doc.id, ...doc.data() }));
   populateFilterOptions();
   buildFormTimingChips();
   wireLocationSelects();
   render();
+  if(!didHandleDeepLink){
+    didHandleDeepLink = true;
+    const sharedId = new URLSearchParams(window.location.search).get('id');
+    if(sharedId) openSharedPlace(sharedId);
+  }
 }, err=>{
   els.results.innerHTML = `<div class="empty">Could not load data: ${escapeHtml(err.message)}</div>`;
 });
